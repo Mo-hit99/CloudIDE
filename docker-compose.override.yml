@@ -1,0 +1,29 @@
+version: '3.9'
+
+services:
+  mongo:
+    ports:
+      - "27017:27017"  # Expose MongoDB port for local development
+    command: ["--logpath", "/dev/null"]  # Disable MongoDB logs to console
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./backend:/app  # Mount source code for hot reloading
+      - /app/node_modules  # Preserve container node_modules
+    command: npm run dev  # Use nodemon for development
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./frontend:/app  # Mount source code for hot reloading
+      - /app/node_modules  # Preserve container node_modules
+    command: npm run dev  # Use Vite dev server

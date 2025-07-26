@@ -1,34 +1,66 @@
-version: '3.8'
+version: '3.9'
+
 services:
   mongo:
-    image: mongo:6
+    image: mongo:7.0
     restart: always
     ports:
       - '27017:27017'
     volumes:
       - mongo-data:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+      - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE}
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   backend:
-    build: ./backend
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
     restart: always
     ports:
-      - '5000:5000'
+      - "${BACKEND_PORT:-5000}:5000"
     env_file:
       - ./backend/.env
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
     volumes:
       - ./backend:/app
+      - /app/node_modules
+    environment:
+      - MONGO_URI=mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongo:27017/${MONGO_INITDB_DATABASE}?authSource=admin
+      - NODE_ENV=${NODE_ENV:-development}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   frontend:
-    build: ./frontend
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
     restart: always
     ports:
-      - '5173:5173'
+      - "${FRONTEND_PORT:-5173}:5173"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     volumes:
       - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:${BACKEND_PORT:-5000}
+      - NODE_ENV=${NODE_ENV:-development}
 
 volumes:
-  mongo-data: 
+  mongo-data:
+    driver: local
