@@ -1,29 +1,63 @@
+# Development override configuration
 version: '3.9'
 
 services:
+  # MongoDB with development settings
   mongo:
     ports:
       - "27017:27017"  # Expose MongoDB port for local development
-    command: ["--logpath", "/dev/null"]  # Disable MongoDB logs to console
+    command: ["mongod", "--logpath", "/dev/null"]  # Disable MongoDB logs to console
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME:-admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD:-password123}
 
+  # Backend development overrides
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        - NODE_VERSION=20-alpine
+    privileged: true  # Required for Docker socket access
     environment:
       - NODE_ENV=development
+      - LOG_LEVEL=debug
+      - DOCKER_HOST=unix:///var/run/docker.sock
     volumes:
       - ./backend:/app  # Mount source code for hot reloading
       - /app/node_modules  # Preserve container node_modules
+      - /var/run/docker.sock:/var/run/docker.sock  # Docker socket access
     command: npm run dev  # Use nodemon for development
+    ports:
+      - "${BACKEND_PORT:-5000}:5000"
+      - "9229:9229"  # Node.js debugger port
 
+  # Frontend development overrides
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - NODE_VERSION=20-alpine
     environment:
       - NODE_ENV=development
+      - VITE_API_URL=http://localhost:${BACKEND_PORT:-5000}
     volumes:
       - ./frontend:/app  # Mount source code for hot reloading
       - /app/node_modules  # Preserve container node_modules
-    command: npm run dev  # Use Vite dev server
+    command: npm run dev -- --host 0.0.0.0  # Use Vite dev server
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+
+  # Enable all development containers by removing profiles
+  dev-container-ubuntu:
+    profiles: []
+
+  dev-container-node:
+    profiles: []
+
+  dev-container-python:
+    profiles: []
+
+  dev-container-java:
+    profiles: []

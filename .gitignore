@@ -1,12 +1,24 @@
 # Dependencies
 node_modules/
 
-# Environment variables
+# Environment variables - NEVER commit these files!
 .env
+.env.*
+!.env.example
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Backend environment files
+backend/.env
+backend/.env.*
+!backend/.env.example
+
+# Frontend environment files
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
 
 # Logs
 logs

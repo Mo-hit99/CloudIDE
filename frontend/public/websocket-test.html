@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Terminal Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .connected { background: #004400; }
+        .disconnected { background: #440000; }
+        .terminal {
+            background: #000;
+            border: 1px solid #333;
+            padding: 10px;
+            height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+        }
+        .input-area {
+            margin-top: 10px;
+        }
+        input {
+            background: #333;
+            color: #00ff00;
+            border: 1px solid #555;
+            padding: 5px;
+            width: 70%;
+            font-family: monospace;
+        }
+        button {
+            background: #555;
+            color: white;
+            border: 1px solid #777;
+            padding: 5px 10px;
+            margin: 0 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #666;
+        }
+        .log {
+            background: #222;
+            border: 1px solid #444;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 WebSocket Terminal Test</h1>
+        
+        <div id="status" class="status disconnected">
+            Status: Disconnected
+        </div>
+        
+        <div>
+            <button onclick="connectWebSocket()">Connect WebSocket</button>
+            <button onclick="connectTerminal()">Connect Terminal</button>
+            <button onclick="disconnectTerminal()">Disconnect Terminal</button>
+            <button onclick="clearTerminal()">Clear Terminal</button>
+        </div>
+        
+        <div>
+            Container ID: 
+            <input type="text" id="containerId" value="04af626d9fce" placeholder="Enter container ID">
+        </div>
+        
+        <div class="terminal" id="terminal">
+            Terminal output will appear here...
+        </div>
+        
+        <div class="input-area">
+            <input type="text" id="commandInput" placeholder="Enter command..." onkeypress="handleKeyPress(event)">
+            <button onclick="sendCommand()">Send</button>
+        </div>
+        
+        <div class="log" id="log">
+            Debug log will appear here...
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        let socket = null;
+        let terminalConnected = false;
+        
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function updateStatus(connected, message = '') {
+            const statusDiv = document.getElementById('status');
+            if (connected) {
+                statusDiv.className = 'status connected';
+                statusDiv.textContent = `Status: Connected ${message}`;
+            } else {
+                statusDiv.className = 'status disconnected';
+                statusDiv.textContent = `Status: Disconnected ${message}`;
+            }
+        }
+        
+        function appendToTerminal(text) {
+            const terminal = document.getElementById('terminal');
+            terminal.innerHTML += text;
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+        
+        function connectWebSocket() {
+            if (socket && socket.connected) {
+                log('WebSocket already connected');
+                return;
+            }
+            
+            log('Connecting to WebSocket...');
+            socket = io('http://localhost:5000', {
+                transports: ['websocket', 'polling'],
+                timeout: 10000,
+                forceNew: true
+            });
+            
+            socket.on('connect', () => {
+                log('WebSocket connected successfully');
+                updateStatus(true, '(WebSocket)');
+            });
+            
+            socket.on('disconnect', (reason) => {
+                log(`WebSocket disconnected: ${reason}`);
+                updateStatus(false, `(${reason})`);
+                terminalConnected = false;
+            });
+            
+            socket.on('connect_error', (error) => {
+                log(`WebSocket connection error: ${error.message}`);
+                updateStatus(false, '(Error)');
+            });
+            
+            socket.on('terminal:connected', (data) => {
+                log(`Terminal connected: ${JSON.stringify(data)}`);
+                terminalConnected = true;
+                updateStatus(true, '(Terminal)');
+                appendToTerminal(`\nTerminal connected to container ${data.containerId}\n`);
+            });
+            
+            socket.on('terminal:output', (data) => {
+                log(`Terminal output received: ${data.substring(0, 50)}...`);
+                appendToTerminal(data);
+            });
+            
+            socket.on('terminal:disconnected', () => {
+                log('Terminal disconnected');
+                terminalConnected = false;
+                updateStatus(true, '(WebSocket only)');
+                appendToTerminal('\n--- Terminal Disconnected ---\n');
+            });
+            
+            socket.on('terminal:error', (error) => {
+                log(`Terminal error: ${error}`);
+                appendToTerminal(`\nTerminal Error: ${error}\n`);
+            });
+        }
+        
+        function connectTerminal() {
+            if (!socket || !socket.connected) {
+                log('WebSocket not connected. Connect WebSocket first.');
+                return;
+            }
+            
+            const containerId = document.getElementById('containerId').value;
+            if (!containerId) {
+                log('Please enter a container ID');
+                return;
+            }
+            
+            log(`Connecting to terminal for container: ${containerId}`);
+            socket.emit('terminal:connect', {
+                containerId: containerId,
+                workingDir: '/workspace'
+            });
+        }
+        
+        function disconnectTerminal() {
+            if (!socket) return;
+            
+            log('Disconnecting terminal...');
+            socket.emit('terminal:disconnect');
+            terminalConnected = false;
+        }
+        
+        function sendCommand() {
+            const input = document.getElementById('commandInput');
+            const command = input.value;
+            
+            if (!command || !terminalConnected) {
+                log('No command entered or terminal not connected');
+                return;
+            }
+            
+            log(`Sending command: ${command}`);
+            socket.emit('terminal:input', command + '\n');
+            input.value = '';
+        }
+        
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendCommand();
+            }
+        }
+        
+        function clearTerminal() {
+            document.getElementById('terminal').innerHTML = '';
+        }
+        
+        // Auto-connect on page load
+        window.onload = function() {
+            log('Page loaded, ready to test WebSocket connection');
+            // Auto-connect WebSocket
+            setTimeout(connectWebSocket, 1000);
+        };
+    </script>
+</body>
+</html>

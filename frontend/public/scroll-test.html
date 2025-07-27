@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scroll Test - Cloud IDE</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            background: #f3f4f6;
+        }
+
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(243, 244, 246, 0.5);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background-color: rgba(156, 163, 175, 0.6);
+            border-radius: 4px;
+            border: 1px solid rgba(243, 244, 246, 0.5);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(156, 163, 175, 0.8);
+        }
+
+        .container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: #1f2937;
+            color: white;
+            padding: 1rem;
+            flex-shrink: 0;
+        }
+
+        .main {
+            flex: 1;
+            display: flex;
+            gap: 1rem;
+            padding: 1rem;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            background: #f9fafb;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #e5e7eb;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            min-height: 0;
+        }
+
+        .left-panel {
+            width: 300px;
+        }
+
+        .middle-panel {
+            flex: 1;
+        }
+
+        .right-panel {
+            width: 300px;
+        }
+
+        .item {
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            background: #f3f4f6;
+            border-radius: 6px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .item:hover {
+            background: #e5e7eb;
+        }
+
+        .code-area {
+            background: #1f2937;
+            color: #10b981;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+            padding: 1rem;
+            overflow: auto;
+            min-height: 0;
+        }
+
+        .terminal {
+            background: #111827;
+            color: #10b981;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .terminal .panel-content {
+            background: #111827;
+        }
+
+        .line-number {
+            color: #6b7280;
+            margin-right: 1rem;
+            user-select: none;
+        }
+
+        .status {
+            background: #059669;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-left: 1rem;
+        }
+
+        .tabs {
+            display: flex;
+            overflow-x: auto;
+            background: #f9fafb;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .tab {
+            padding: 0.5rem 1rem;
+            border-right: 1px solid #e5e7eb;
+            background: white;
+            cursor: pointer;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .tab:hover {
+            background: #f3f4f6;
+        }
+
+        .tab.active {
+            background: #3b82f6;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>☁️ Cloud IDE - Scroll Test</h1>
+            <span class="status">Scrolling Working ✓</span>
+        </div>
+
+        <div class="main">
+            <!-- Left Panel - File Explorer -->
+            <div class="panel left-panel">
+                <div class="panel-header">📁 File Explorer</div>
+                <div class="panel-content">
+                    <div class="item">📁 src/</div>
+                    <div class="item">📁 components/</div>
+                    <div class="item">📄 App.jsx</div>
+                    <div class="item">📄 index.js</div>
+                    <div class="item">📁 styles/</div>
+                    <div class="item">📄 scrollbar.css</div>
+                    <div class="item">📄 responsive.css</div>
+                    <div class="item">📁 public/</div>
+                    <div class="item">📄 index.html</div>
+                    <div class="item">📁 assets/</div>
+                    <div class="item">📄 logo.svg</div>
+                    <div class="item">📁 tests/</div>
+                    <div class="item">📄 App.test.js</div>
+                    <div class="item">📁 docs/</div>
+                    <div class="item">📄 README.md</div>
+                    <div class="item">📄 package.json</div>
+                    <div class="item">📄 package-lock.json</div>
+                    <div class="item">📁 node_modules/</div>
+                    <div class="item">📁 build/</div>
+                    <div class="item">📄 .gitignore</div>
+                    <div class="item">📄 .env</div>
+                    <div class="item">📁 config/</div>
+                    <div class="item">📄 webpack.config.js</div>
+                    <div class="item">📁 scripts/</div>
+                    <div class="item">📄 build.js</div>
+                    <div class="item">📄 start.js</div>
+                    <div class="item">📁 utils/</div>
+                    <div class="item">📄 helpers.js</div>
+                    <div class="item">📄 constants.js</div>
+                    <div class="item">📁 hooks/</div>
+                    <div class="item">📄 useApi.js</div>
+                    <div class="item">📄 useWebSocket.js</div>
+                    <div class="item">📁 services/</div>
+                    <div class="item">📄 api.js</div>
+                    <div class="item">📄 websocket.js</div>
+                </div>
+            </div>
+
+            <!-- Middle Panel - Code Editor -->
+            <div class="panel middle-panel">
+                <div class="tabs">
+                    <div class="tab active">App.jsx</div>
+                    <div class="tab">index.js</div>
+                    <div class="tab">scrollbar.css</div>
+                    <div class="tab">responsive.css</div>
+                    <div class="tab">api.js</div>
+                    <div class="tab">websocket.js</div>
+                    <div class="tab">package.json</div>
+                    <div class="tab">README.md</div>
+                    <div class="tab">webpack.config.js</div>
+                    <div class="tab">build.js</div>
+                </div>
+                <div class="panel-header">📝 Code Editor - App.jsx</div>
+                <div class="code-area">
+<span class="line-number"> 1</span>import React, { useState, useEffect } from 'react';
+<span class="line-number"> 2</span>import './styles/scrollbar.css';
+<span class="line-number"> 3</span>
+<span class="line-number"> 4</span>function App() {
+<span class="line-number"> 5</span>  const [scrollTest, setScrollTest] = useState(true);
+<span class="line-number"> 6</span>
+<span class="line-number"> 7</span>  useEffect(() => {
+<span class="line-number"> 8</span>    console.log('Scroll test initialized');
+<span class="line-number"> 9</span>  }, []);
+<span class="line-number">10</span>
+<span class="line-number">11</span>  return (
+<span class="line-number">12</span>    &lt;div className="app"&gt;
+<span class="line-number">13</span>      &lt;header&gt;Cloud IDE&lt;/header&gt;
+<span class="line-number">14</span>      &lt;main&gt;
+<span class="line-number">15</span>        &lt;div className="sidebar"&gt;
+<span class="line-number">16</span>          &lt;FileExplorer /&gt;
+<span class="line-number">17</span>        &lt;/div&gt;
+<span class="line-number">18</span>        &lt;div className="editor"&gt;
+<span class="line-number">19</span>          &lt;CodeEditor /&gt;
+<span class="line-number">20</span>        &lt;/div&gt;
+<span class="line-number">21</span>        &lt;div className="terminal"&gt;
+<span class="line-number">22</span>          &lt;Terminal /&gt;
+<span class="line-number">23</span>        &lt;/div&gt;
+<span class="line-number">24</span>      &lt;/main&gt;
+<span class="line-number">25</span>    &lt;/div&gt;
+<span class="line-number">26</span>  );
+<span class="line-number">27</span>}
+<span class="line-number">28</span>
+<span class="line-number">29</span>export default App;
+<span class="line-number">30</span>
+<span class="line-number">31</span>// Additional code to test scrolling
+<span class="line-number">32</span>// This content extends beyond the visible area
+<span class="line-number">33</span>// to demonstrate vertical scrolling functionality
+<span class="line-number">34</span>
+<span class="line-number">35</span>/* 
+<span class="line-number">36</span> * Scrollbar CSS Implementation
+<span class="line-number">37</span> * 
+<span class="line-number">38</span> * ::-webkit-scrollbar {
+<span class="line-number">39</span> *   width: 8px;
+<span class="line-number">40</span> *   height: 8px;
+<span class="line-number">41</span> * }
+<span class="line-number">42</span> * 
+<span class="line-number">43</span> * ::-webkit-scrollbar-thumb {
+<span class="line-number">44</span> *   background-color: rgba(156, 163, 175, 0.6);
+<span class="line-number">45</span> *   border-radius: 4px;
+<span class="line-number">46</span> * }
+<span class="line-number">47</span> */
+<span class="line-number">48</span>
+<span class="line-number">49</span>// End of file
+<span class="line-number">50</span>
+                </div>
+            </div>
+
+            <!-- Right Panel - Terminal -->
+            <div class="panel right-panel terminal">
+                <div class="panel-header" style="background: #374151; color: white;">🖥️ Terminal</div>
+                <div class="panel-content">
+                    <div>$ npm start</div>
+                    <div style="color: #60a5fa;">Starting development server...</div>
+                    <div style="color: #10b981;">✓ Server started on port 5173</div>
+                    <div style="color: #6b7280;">Watching for file changes...</div>
+                    <div><br></div>
+                    <div>$ ls -la</div>
+                    <div>total 48</div>
+                    <div>drwxr-xr-x  12 user user  4096 Dec 15 10:30 .</div>
+                    <div>drwxr-xr-x   3 user user  4096 Dec 15 10:29 ..</div>
+                    <div>-rw-r--r--   1 user user   310 Dec 15 10:30 .gitignore</div>
+                    <div>-rw-r--r--   1 user user  3184 Dec 15 10:30 package.json</div>
+                    <div>-rw-r--r--   1 user user  1234 Dec 15 10:30 README.md</div>
+                    <div>drwxr-xr-x   2 user user  4096 Dec 15 10:30 public</div>
+                    <div>drwxr-xr-x   3 user user  4096 Dec 15 10:30 src</div>
+                    <div>drwxr-xr-x 800 user user 32768 Dec 15 10:30 node_modules</div>
+                    <div><br></div>
+                    <div>$ git status</div>
+                    <div>On branch main</div>
+                    <div>Your branch is up to date with 'origin/main'.</div>
+                    <div><br></div>
+                    <div>Changes not staged for commit:</div>
+                    <div style="color: #ef4444;">  modified:   src/App.jsx</div>
+                    <div style="color: #ef4444;">  modified:   src/styles/scrollbar.css</div>
+                    <div><br></div>
+                    <div>Untracked files:</div>
+                    <div style="color: #ef4444;">  src/Components/ScrollTest.jsx</div>
+                    <div style="color: #ef4444;">  src/styles/responsive.css</div>
+                    <div><br></div>
+                    <div>$ npm test</div>
+                    <div style="color: #10b981;">PASS</div> src/App.test.js</div>
+                    <div style="color: #10b981;">✓</div> renders learn react link (23ms)</div>
+                    <div><br></div>
+                    <div>Test Suites: 1 passed, 1 total</div>
+                    <div>Tests:       1 passed, 1 total</div>
+                    <div>Snapshots:   0 total</div>
+                    <div>Time:        2.841s</div>
+                    <div><br></div>
+                    <div>$ docker ps</div>
+                    <div>CONTAINER ID   IMAGE               STATUS</div>
+                    <div>72f24c917642   cloud-ide-backend   Up 30 minutes</div>
+                    <div>5fbbf0668454   cloud-ide-frontend  Up 2 minutes</div>
+                    <div>e4df327fbb5c   cloud-ide-mongo     Up 30 minutes</div>
+                    <div><br></div>
+                    <div>$ curl http://localhost:5000/api/docker/health</div>
+                    <div style="color: #10b981;">{"status":"healthy","docker_available":true}</div>
+                    <div><br></div>
+                    <div>$ _</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Add some interactive behavior
+        document.querySelectorAll('.item').forEach(item => {
+            item.addEventListener('click', () => {
+                console.log('File selected:', item.textContent);
+            });
+        });
+
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                console.log('Tab selected:', tab.textContent);
+            });
+        });
+
+        // Test scrolling programmatically
+        setTimeout(() => {
+            const panels = document.querySelectorAll('.panel-content');
+            panels.forEach(panel => {
+                panel.scrollTop = 50; // Scroll down a bit to show scrolling works
+            });
+        }, 1000);
+
+        console.log('Scroll test page loaded successfully!');
+    </script>
+</body>
+</html>

@@ -1,47 +1,178 @@
+# Production configuration with security hardening
 version: '3.9'
 
 services:
+  # MongoDB Database - Production configuration
   mongo:
+    image: mongo:8.0
+    container_name: cloud-ide-mongo-prod
     restart: always
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+      - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-cloudIDE}
     volumes:
-      - mongo-data:/data/db
+      - mongo-data-prod:/data/db
+      - mongo-config-prod:/data/configdb
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
-    command: ["--wiredTigerCacheSizeGB", "0.5", "--logpath", "/dev/null"]
+    command: ["mongod", "--auth", "--bind_ip_all", "--wiredTigerCacheSizeGB", "0.5"]
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - cloud-ide-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
 
+  # Backend API Server - Production
   backend:
-    restart: always
     build:
       context: ./backend
       dockerfile: Dockerfile
       args:
-        - NODE_ENV=production
+        - NODE_VERSION=18-alpine
+    container_name: cloud-ide-backend-prod
+    restart: always
+    privileged: true
+    expose:
+      - "5000"
+    env_file:
+      - ./backend/.env
+    depends_on:
+      mongo:
+        condition: service_healthy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - NODE_ENV=production
+      - MONGO_URI=mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongo:27017/${MONGO_INITDB_DATABASE:-cloudIDE}?authSource=admin
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      - LOG_LEVEL=warn
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - cloud-ide-network
 
+  # Frontend with production build
   frontend:
     restart: always
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - NODE_ENV=production
+        - NODE_VERSION=18-alpine
+    container_name: cloud-ide-frontend-prod
     environment:
       - NODE_ENV=production
+      - VITE_API_URL=https://${DOMAIN:-localhost}/api
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - cloud-ide-network
+
+  # Redis for session management and caching (optional)
+  redis:
+    image: redis:7.4-alpine
+    container_name: cloud-ide-redis-prod
+    restart: always
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-defaultpassword}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD:-defaultpassword}", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - cloud-ide-network
+    profiles:
+      - cache
+
+  # Nginx reverse proxy for production
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: cloud-ide-nginx-prod
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx-logs:/var/log/nginx
+    depends_on:
+      - frontend
+      - backend
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - cloud-ide-network
 
 volumes:
-  mongo-data:
+  mongo-data-prod:
     driver: local
+    name: cloud-ide-mongo-data-prod
+  mongo-config-prod:
+    driver: local
+    name: cloud-ide-mongo-config-prod
+  redis-data:
+    driver: local
+    name: cloud-ide-redis-data-prod
+  nginx-logs:
+    driver: local
+    name: cloud-ide-nginx-logs-prod
+
+# Custom network for service communication
+networks:
+  cloud-ide-network:
+    driver: bridge
+    name: cloud-ide-network-prod
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
