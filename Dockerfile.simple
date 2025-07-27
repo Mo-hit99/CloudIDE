@@ -1,0 +1,52 @@
+# Simple Dockerfile for Cloud IDE
+# This approach builds frontend locally and copies the dist folder
+
+FROM node:18-alpine
+
+# Install system dependencies
+RUN apk add --no-cache \
+    docker-cli \
+    curl \
+    bash \
+    dumb-init
+
+# Create app user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+# Set working directory
+WORKDIR /app
+
+# Copy backend
+COPY backend/ ./backend/
+
+# Copy pre-built frontend (build locally first)
+COPY frontend/dist/ ./frontend/dist/
+
+# Install backend dependencies
+WORKDIR /app/backend
+RUN npm ci --only=production
+
+# Create necessary directories
+RUN mkdir -p /app/workspace && \
+    chown -R nodejs:nodejs /app/workspace /app/backend /app/frontend
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=5000
+
+# Expose ports
+EXPOSE 5000
+
+# Switch to non-root user
+USER nodejs
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:5000/health || exit 1
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start the backend server
+CMD ["node", "index.js"]

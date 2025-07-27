@@ -1,0 +1,161 @@
+# Production Dockerfile for Cloud IDE
+# Optimized for production deployment with Nginx
+
+# =============================================================================
+# Stage 1: Build Frontend
+# =============================================================================
+FROM node:18-alpine AS frontend-builder
+
+# Set working directory
+WORKDIR /app/frontend
+
+# Copy frontend package files
+COPY frontend/package*.json ./
+
+# Install all dependencies (including devDependencies for build)
+RUN npm ci
+
+# Copy frontend source code
+COPY frontend/ ./
+
+# Set production environment
+ENV NODE_ENV=production
+ENV VITE_API_URL=/api
+
+# Build frontend for production
+RUN npm run build
+
+# =============================================================================
+# Stage 2: Build Backend
+# =============================================================================
+FROM node:18-alpine AS backend-builder
+
+# Set working directory
+WORKDIR /app/backend
+
+# Copy backend package files
+COPY backend/package*.json ./
+
+# Install only production dependencies
+RUN npm ci --only=production && npm cache clean --force
+
+# Copy backend source code
+COPY backend/ ./
+
+# =============================================================================
+# Stage 3: Nginx for Frontend
+# =============================================================================
+FROM nginx:1.27-alpine AS frontend-nginx
+
+# Copy custom nginx configuration
+COPY nginx/nginx.prod.conf /etc/nginx/nginx.conf
+
+# Copy frontend build
+COPY --from=frontend-builder /app/frontend/dist /usr/share/nginx/html
+
+# Create nginx user and set permissions
+RUN chown -R nginx:nginx /usr/share/nginx/html && \
+    chmod -R 755 /usr/share/nginx/html
+
+# Expose port
+EXPOSE 80
+
+# =============================================================================
+# Stage 4: Production Backend
+# =============================================================================
+FROM node:18-alpine AS backend-production
+
+# Install system dependencies
+RUN apk add --no-cache \
+    docker-cli \
+    curl \
+    bash \
+    dumb-init
+
+# Create app user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+# Set working directory
+WORKDIR /app
+
+# Copy backend from builder stage
+COPY --from=backend-builder --chown=nodejs:nodejs /app/backend ./
+
+# Create necessary directories
+RUN mkdir -p /app/workspace /app/logs && \
+    chown -R nodejs:nodejs /app/workspace /app/logs
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=5000
+
+# Expose port
+EXPOSE 5000
+
+# Switch to non-root user
+USER nodejs
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:5000/health || exit 1
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start the application
+CMD ["node", "index.js"]
+
+# =============================================================================
+# Stage 5: All-in-One Production (Default)
+# =============================================================================
+FROM node:18-alpine AS production
+
+# Install system dependencies
+RUN apk add --no-cache \
+    docker-cli \
+    nginx \
+    curl \
+    bash \
+    dumb-init \
+    supervisor
+
+# Create app user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+# Set working directory
+WORKDIR /app
+
+# Copy backend from builder stage
+COPY --from=backend-builder --chown=nodejs:nodejs /app/backend ./backend
+
+# Copy frontend build
+COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
+
+# Copy nginx configuration
+COPY nginx/nginx.prod.conf /etc/nginx/nginx.conf
+
+# Copy supervisor configuration
+COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Create necessary directories
+RUN mkdir -p /app/workspace /app/logs /var/log/supervisor && \
+    chown -R nodejs:nodejs /app/workspace /app/logs
+
+# Set up nginx to serve frontend
+RUN ln -sf /app/frontend/dist /usr/share/nginx/html
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=5000
+
+# Expose ports
+EXPOSE 80 5000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost/health || exit 1
+
+# Use supervisor to run both nginx and node
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

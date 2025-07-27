@@ -1,0 +1,99 @@
+# Docker Compose configuration for Cloud IDE using Docker Hub image
+# This file uses the pre-built image from Docker Hub for quick deployment
+
+version: '3.8'
+
+services:
+  # Cloud IDE Application (from Docker Hub)
+  cloud-ide:
+    image: mohitkohli007/cloud_ide:v1.0
+    container_name: cloud-ide-app
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount Docker socket for container management
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Persistent workspace storage
+      - cloud-ide-workspace:/app/workspace
+      # Optional: Mount local workspace for development
+      # - ./workspace:/app/workspace
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - MONGO_URI=mongodb://admin:password123@mongo:27017/cloudIDE?authSource=admin
+      - JWT_SECRET=your-jwt-secret-change-in-production
+      - SESSION_SECRET=your-session-secret-change-in-production
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - FRONTEND_URL=http://localhost:5000
+    depends_on:
+      - mongo
+    restart: unless-stopped
+    networks:
+      - cloud-ide-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # MongoDB Database
+  mongo:
+    image: mongo:8.0
+    container_name: cloud-ide-mongo
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: cloudIDE
+    volumes:
+      - cloud-ide-mongo-data:/data/db
+      - cloud-ide-mongo-config:/data/configdb
+    restart: unless-stopped
+    networks:
+      - cloud-ide-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: MongoDB Express for database management
+  mongo-express:
+    image: mongo-express:latest
+    container_name: cloud-ide-mongo-express
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: password123
+      ME_CONFIG_MONGODB_URL: mongodb://admin:password123@mongo:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin123
+    depends_on:
+      - mongo
+    restart: unless-stopped
+    networks:
+      - cloud-ide-network
+    profiles:
+      - tools
+
+# Named volumes for persistent data
+volumes:
+  cloud-ide-workspace:
+    driver: local
+    name: cloud-ide-workspace
+  cloud-ide-mongo-data:
+    driver: local
+    name: cloud-ide-mongo-data
+  cloud-ide-mongo-config:
+    driver: local
+    name: cloud-ide-mongo-config
+
+# Custom network for service communication
+networks:
+  cloud-ide-network:
+    driver: bridge
+    name: cloud-ide-network

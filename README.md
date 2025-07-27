@@ -96,6 +96,31 @@ A modern, professional-grade web-based Integrated Development Environment (IDE) 
 - **4GB+ RAM** - Available system memory
 - **10GB+ Disk Space** - For Docker images and containers
 
+### **🐳 Quick Start with Docker Hub (Fastest)**
+
+Get started instantly with our pre-built Docker image from Docker Hub:
+
+```bash
+# Pull the latest Cloud IDE image
+docker pull mohitkohli007/cloud_ide:v1.0
+
+# Run the Cloud IDE container
+docker run -d \
+  --name cloud-ide \
+  -p 5000:5000 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  mohitkohli007/cloud_ide:v1.0
+
+# Access your Cloud IDE at http://localhost:5000
+```
+
+**🎯 Alternative tags available:**
+- `mohitkohli007/cloud_ide:latest` - Latest stable version
+- `mohitkohli007/cloud_ide:v1.0` - Specific version 1.0
+- `mohitkohli007/cloud_ide:stable` - Production-ready stable build
+
+**📋 Docker Hub Repository:** [mohitkohli007/cloud_ide](https://hub.docker.com/r/mohitkohli007/cloud_ide)
+
 ### **🎯 One-Command Deployment (Recommended)**
 
 1. **Clone the repository:**
@@ -134,6 +159,66 @@ docker-compose logs -f
 
 # Stop services
 docker-compose down
+```
+
+#### **🐳 Docker Hub Deployment Options**
+
+**Basic Deployment:**
+```bash
+# Pull and run the latest version
+docker pull mohitkohli007/cloud_ide:v1.0
+docker run -d --name cloud-ide -p 5000:5000 mohitkohli007/cloud_ide:v1.0
+```
+
+**Production Deployment with Volume Mounting:**
+```bash
+# Create persistent volumes for data
+docker volume create cloud-ide-data
+docker volume create cloud-ide-workspace
+
+# Run with persistent storage
+docker run -d \
+  --name cloud-ide-prod \
+  -p 80:5000 \
+  -v cloud-ide-data:/app/data \
+  -v cloud-ide-workspace:/app/workspace \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  --restart unless-stopped \
+  mohitkohli007/cloud_ide:v1.0
+```
+
+**Development with Hot Reloading:**
+```bash
+# Run with local code mounting for development
+docker run -d \
+  --name cloud-ide-dev \
+  -p 5000:5000 \
+  -v $(pwd)/workspace:/app/workspace \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  mohitkohli007/cloud_ide:v1.0
+```
+
+**Docker Compose with Docker Hub Image:**
+```yaml
+# docker-compose.hub.yml
+version: '3.8'
+services:
+  cloud-ide:
+    image: mohitkohli007/cloud_ide:v1.0
+    ports:
+      - "5000:5000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - cloud-ide-workspace:/app/workspace
+    restart: unless-stopped
+
+volumes:
+  cloud-ide-workspace:
+```
+
+```bash
+# Deploy using the Docker Hub compose file
+docker-compose -f docker-compose.hub.yml up -d
 ```
 
 #### **Individual Service Management**
@@ -627,6 +712,33 @@ docker system prune -f
 docker volume prune -f
 ```
 
+#### **🐳 Docker Hub Image Issues**
+```bash
+# Pull the latest Cloud IDE image
+docker pull mohitkohli007/cloud_ide:v1.0
+
+# Check if image was pulled successfully
+docker images mohitkohli007/cloud_ide
+
+# Remove old/corrupted images
+docker rmi mohitkohli007/cloud_ide:v1.0
+docker pull mohitkohli007/cloud_ide:v1.0
+
+# Check container status
+docker ps -a | grep cloud-ide
+
+# View container logs
+docker logs cloud-ide
+
+# Restart container
+docker restart cloud-ide
+
+# Remove and recreate container
+docker stop cloud-ide
+docker rm cloud-ide
+docker run -d --name cloud-ide -p 5000:5000 mohitkohli007/cloud_ide:v1.0
+```
+
 #### **🍃 MongoDB Connection Issues**
 ```bash
 # Check MongoDB container status
@@ -791,6 +903,70 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 - ✅ Private use allowed
 - ❌ No warranty provided
 - ❌ No liability accepted
+
+## 📋 Quick Reference
+
+### **🐳 Docker Hub Commands**
+
+```bash
+# Pull the latest image
+docker pull mohitkohli007/cloud_ide:v1.0
+
+# Run basic container
+docker run -d --name cloud-ide -p 5000:5000 mohitkohli007/cloud_ide:v1.0
+
+# Run with Docker socket (for container management)
+docker run -d --name cloud-ide -p 5000:5000 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  mohitkohli007/cloud_ide:v1.0
+
+# Run with persistent workspace
+docker run -d --name cloud-ide -p 5000:5000 \
+  -v cloud-ide-workspace:/app/workspace \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  mohitkohli007/cloud_ide:v1.0
+
+# Use Docker Compose with Docker Hub image
+docker-compose -f docker-compose.hub.yml up -d
+
+# Check container status
+docker ps | grep cloud-ide
+
+# View logs
+docker logs cloud-ide
+
+# Stop and remove
+docker stop cloud-ide && docker rm cloud-ide
+```
+
+### **🔗 Important URLs**
+
+| Service | URL | Description |
+|---------|-----|-------------|
+| **Cloud IDE** | http://localhost:5000 | Main application interface |
+| **API Health** | http://localhost:5000/health | Health check endpoint |
+| **MongoDB** | mongodb://localhost:27017 | Database connection |
+| **Mongo Express** | http://localhost:8081 | Database admin interface |
+| **Docker Hub** | https://hub.docker.com/r/mohitkohli007/cloud_ide | Official Docker image |
+
+### **⚡ Quick Commands**
+
+```bash
+# One-liner deployment
+docker run -d --name cloud-ide -p 5000:5000 -v /var/run/docker.sock:/var/run/docker.sock mohitkohli007/cloud_ide:v1.0
+
+# Check if everything is working
+curl http://localhost:5000/health
+
+# View real-time logs
+docker logs -f cloud-ide
+
+# Access container shell
+docker exec -it cloud-ide /bin/bash
+
+# Update to latest version
+docker pull mohitkohli007/cloud_ide:latest && docker stop cloud-ide && docker rm cloud-ide && docker run -d --name cloud-ide -p 5000:5000 -v /var/run/docker.sock:/var/run/docker.sock mohitkohli007/cloud_ide:latest
+```
 
 ## 🆘 Support & Community
 
