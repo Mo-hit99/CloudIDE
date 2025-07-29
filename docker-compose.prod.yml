@@ -1,5 +1,3 @@
-version: '3.9'
-
 # ☁️ Cloud IDE - Production Environment
 # Production configuration with Nginx, Frontend, Backend, and MongoDB
 
@@ -7,7 +5,7 @@ services:
   # 🌐 Nginx - Reverse Proxy
   nginx:
     image: nginx:alpine
-    container_name: cloud-ide-nginx
+    container_name: cloud-ide-nginx-prod
     restart: unless-stopped
     ports:
       - "80:80"
@@ -51,11 +49,9 @@ services:
 
   # 🟢 Backend API Server
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-      target: production
+    image: cloud-ide-backend-prod:latest
     container_name: cloud-ide-backend-prod
+    command: ["node", "index.js"]
     restart: unless-stopped
     privileged: true
     expose:
@@ -87,10 +83,7 @@ services:
 
   # ⚛️ Frontend React Application
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: production
+    image: cloud-ide-frontend-prod:latest
     container_name: cloud-ide-frontend-prod
     restart: unless-stopped
     volumes:
@@ -105,22 +98,22 @@ services:
 volumes:
   mongo-data:
     driver: local
-    name: cloud-ide-mongo-data-prod
+    name: cloud-ide-mongo-data-prod-compose
   mongo-config:
     driver: local
-    name: cloud-ide-mongo-config-prod
+    name: cloud-ide-mongo-config-prod-compose
   workspace-data:
     driver: local
-    name: cloud-ide-workspace-prod
+    name: cloud-ide-workspace-prod-compose
   logs-data:
     driver: local
-    name: cloud-ide-logs-prod
+    name: cloud-ide-logs-prod-compose
   frontend-dist:
     driver: local
-    name: cloud-ide-frontend-dist-prod
+    name: cloud-ide-frontend-dist-prod-compose
 
 # 🌐 Network
 networks:
   cloud-ide-network:
     driver: bridge
-    name: cloud-ide-network-prod
+    name: cloud-ide-network-prod-compose

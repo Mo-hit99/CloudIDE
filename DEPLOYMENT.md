@@ -9,15 +9,29 @@
 - 4GB+ RAM available
 - 10GB+ disk space
 
-### One-Command Deployment
+### Development Environment
 
 ```bash
-# Development deployment
-./deploy.sh dev
+# Build development images
+docker build -t cloud-ide-backend-compose:latest ./backend --target development
+docker build -t cloud-ide-frontend-compose:latest ./frontend --target development
 
-# Production deployment
-./deploy.sh prod
+# Start development services
+docker-compose up -d
 ```
+
+### Production Environment
+
+```bash
+# Build production images
+docker build -t cloud-ide-backend-prod:latest ./backend --target production
+docker build -t cloud-ide-frontend-prod:latest ./frontend --target production
+
+# Start production services
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+
 
 ## 📋 Current Docker Images
 
@@ -93,33 +107,6 @@ CONTAINER_CPU_LIMIT=0.5
 
 ## 🚀 Deployment Commands
 
-### Using Deploy Script
-
-```bash
-# Development deployment
-./deploy.sh dev
-
-# Production deployment
-./deploy.sh prod
-
-# Build images only
-./deploy.sh build
-
-# Clean up old containers/images
-./deploy.sh cleanup
-
-# Show logs
-./deploy.sh logs
-
-# Stop services
-./deploy.sh stop
-
-# Restart services
-./deploy.sh restart
-
-# Show status
-./deploy.sh status
-```
 
 ### Manual Docker Compose
 
@@ -206,9 +193,7 @@ docker pull mongo:8.0
 docker pull node:18-alpine
 docker pull nginx:1.27-alpine
 
-# Rebuild custom images
-./deploy.sh build
-```
+
 
 ### Clean Up
 ```bash

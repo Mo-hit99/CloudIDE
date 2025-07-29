@@ -1,23 +1,18 @@
-version: '3.9'
-
-# ☁️ Cloud IDE - Development Environment
-# Optimized Docker Compose configuration for development with hot reloading
-
+# Cloud IDE - Development Environment
 services:
-  # 🍃 MongoDB Database - Latest stable version with optimized settings
   mongo:
     image: mongo:8.0
-    container_name: cloud-ide-mongo
+    container_name: cloud-ide-mongo-compose
     restart: unless-stopped
     ports:
-      - '27017:27017'
+      - "27017:27017"
     volumes:
       - mongo-data:/data/db
       - mongo-config:/data/configdb
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME:-admin}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD:-password123}
-      - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-cloudIDE}
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password123
+      - MONGO_INITDB_DATABASE=cloudIDE
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 30s
@@ -27,19 +22,14 @@ services:
     networks:
       - cloud-ide-network
 
-  # 🟢 Backend API Server
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-      target: development
-    container_name: cloud-ide-backend
+    image: cloud-ide-backend-compose:latest
+    container_name: cloud-ide-backend-compose
     restart: unless-stopped
     privileged: true
     ports:
-      - "${BACKEND_PORT:-5000}:5000"
-    env_file:
-      - ./backend/.env
+      - "5000:5000"
+    command: ["node", "index.js"]
     depends_on:
       mongo:
         condition: service_healthy
@@ -49,40 +39,29 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./workspace:/app/workspace
     environment:
-      - MONGO_URI=mongodb://${MONGO_INITDB_ROOT_USERNAME:-admin}:${MONGO_INITDB_ROOT_PASSWORD:-password123}@mongo:27017/${MONGO_INITDB_DATABASE:-cloudIDE}?authSource=admin
+      - MONGO_URI=mongodb://admin:password123@mongo:27017/cloudIDE?authSource=admin
       - NODE_ENV=development
-      - FRONTEND_URL=http://localhost:${FRONTEND_PORT:-5173}
+      - FRONTEND_URL=http://localhost:5173
       - DOCKER_HOST=unix:///var/run/docker.sock
-      - JWT_SECRET=${JWT_SECRET:-dev-secret-key}
-      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
-      - LOG_LEVEL=${LOG_LEVEL:-debug}
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:5000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      - JWT_SECRET=dev-secret-key
+      - JWT_EXPIRES_IN=7d
+      - LOG_LEVEL=debug
     networks:
       - cloud-ide-network
 
-  # ⚛️ Frontend React Application
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: development
-    container_name: cloud-ide-frontend
+    image: cloud-ide-frontend-compose:latest
+    container_name: cloud-ide-frontend-compose
     restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT:-5173}:5173"
+      - "5173:5173"
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     volumes:
       - ./frontend:/app
       - /app/node_modules
     environment:
-      - VITE_API_URL=http://localhost:${BACKEND_PORT:-5000}
+      - VITE_API_URL=http://localhost:5000
       - NODE_ENV=development
       - VITE_APP_NAME=Cloud IDE
       - VITE_APP_VERSION=2.0.0
@@ -95,19 +74,15 @@ services:
     networks:
       - cloud-ide-network
 
-
-
-# 💾 Volumes
 volumes:
   mongo-data:
     driver: local
-    name: cloud-ide-mongo-data-dev
+    name: cloud-ide-mongo-data-compose
   mongo-config:
     driver: local
-    name: cloud-ide-mongo-config-dev
+    name: cloud-ide-mongo-config-compose
 
-# 🌐 Network
 networks:
   cloud-ide-network:
     driver: bridge
-    name: cloud-ide-network-dev
+    name: cloud-ide-network-compose
