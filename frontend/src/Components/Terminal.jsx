@@ -37,7 +37,9 @@ const Terminal = ({ containerId, darkMode, onError }) => {
   // Setup WebSocket event handlers
   useEffect(() => {
     const handleTerminalOutput = (data) => {
-      setOutput(prev => prev + data.data);
+      // Handle both string and object formats
+      const outputText = typeof data === 'string' ? data : (data.data || data);
+      setOutput(prev => prev + outputText);
     };
 
     const handleTerminalConnected = (data) => {

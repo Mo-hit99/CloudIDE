@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHand
 import websocketService from '../services/websocket';
 import { fileAPI, handleAPIError } from '../services/api';
 
-const EnhancedTerminal = forwardRef(({ containerId, darkMode, onError, currentWorkingDir = '/workspace' }, ref) => {
+const EnhancedTerminal = forwardRef(({ containerId, workspaceId, darkMode, onError, currentWorkingDir = '/workspace' }, ref) => {
   const [output, setOutput] = useState('');
   const [input, setInput] = useState('');
   const [isConnected, setIsConnected] = useState(false);
@@ -31,7 +31,9 @@ const EnhancedTerminal = forwardRef(({ containerId, darkMode, onError, currentWo
   // WebSocket event handlers
   useEffect(() => {
     const handleTerminalOutput = (data) => {
-      setOutput(prev => prev + data);
+      // Handle both string and object formats
+      const outputText = typeof data === 'string' ? data : (data.data || data);
+      setOutput(prev => prev + outputText);
       setIsExecuting(false);
     };
 
@@ -50,8 +52,15 @@ const EnhancedTerminal = forwardRef(({ containerId, darkMode, onError, currentWo
     const handleTerminalError = (error) => {
       setIsConnecting(false);
       setIsExecuting(false);
-      onError?.(error);
-      setOutput(prev => prev + `\nError: ${error}\n`);
+
+      // Extract error message from error object
+      const errorMessage = typeof error === 'string'
+        ? error
+        : error?.error || error?.message || JSON.stringify(error);
+
+      console.error('Terminal error:', error);
+      onError?.(errorMessage);
+      setOutput(prev => prev + `\nTerminal Error: ${errorMessage}\n`);
     };
 
     // Register event listeners
@@ -100,7 +109,7 @@ const EnhancedTerminal = forwardRef(({ containerId, darkMode, onError, currentWo
 
       console.log('Connecting to terminal for container:', containerId);
       // Connect to terminal
-      websocketService.connectTerminal(containerId, workingDir);
+      websocketService.connectTerminal(containerId, workingDir, workspaceId);
     } catch (error) {
       console.error('Failed to connect to terminal:', error);
       setIsConnecting(false);

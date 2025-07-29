@@ -156,13 +156,13 @@ class WebSocketService {
   }
 
   // Terminal methods
-  connectTerminal(containerId, workingDir = '/app') {
+  connectTerminal(containerId, workingDir = '/app', workspaceId = null) {
     if (!this.socket || !this.isConnected) {
       throw new Error('WebSocket not connected');
     }
-    
+
     console.log('Connecting to terminal for container:', containerId);
-    this.socket.emit('terminal:connect', { containerId, workingDir });
+    this.socket.emit('terminal:connect', { containerId, workingDir, workspaceId });
   }
 
   sendTerminalInput(input) {

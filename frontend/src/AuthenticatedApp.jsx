@@ -299,6 +299,7 @@ function AuthenticatedApp() {
             <EnhancedTerminal
               ref={terminalRef}
               containerId={user?.containerId}
+              workspaceId={user?.workspaceId}
               darkMode={darkMode}
               onError={handleError}
               currentWorkingDir="/workspace"

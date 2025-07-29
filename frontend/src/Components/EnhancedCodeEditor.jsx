@@ -156,15 +156,23 @@ const EnhancedCodeEditor = ({
   const openFile = useCallback((file) => {
     if (!file || file.data?.type !== 'file') return;
 
+    console.log('🔧 Opening file:', file.text, 'Current open files:', openFiles.length);
+
     // Check if file is already open
     const existingFile = openFiles.find(f => f.id === file.id);
     if (existingFile) {
+      console.log('📁 File already open, switching to it');
       setActiveFileId(file.id);
       return;
     }
 
     // Add to open files
-    setOpenFiles(prev => [...prev, file]);
+    console.log('➕ Adding new file to tabs');
+    setOpenFiles(prev => {
+      const newFiles = [...prev, file];
+      console.log('📂 Total open files after adding:', newFiles.length);
+      return newFiles;
+    });
     setActiveFileId(file.id);
     loadFileContent(file);
   }, [openFiles, loadFileContent]);
@@ -309,6 +317,9 @@ const EnhancedCodeEditor = ({
       Object.values(autoSaveTimeoutRef.current).forEach(clearTimeout);
     };
   }, []);
+
+  // Debug logging
+  console.log('🎯 CodeEditor render - Open files:', openFiles.length, openFiles.map(f => f.text));
 
   return (
     <div className="h-full flex flex-col bg-white dark:bg-gray-800">

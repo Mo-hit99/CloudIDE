@@ -3,6 +3,7 @@ import Docker from 'dockerode';
 import { Readable } from 'stream';
 import tar from 'tar-stream';
 import path from 'path';
+import fs from 'fs/promises';
 import {
   fileRateLimit,
   validateContainerId,
@@ -131,13 +132,31 @@ const createTarStream = (filename, content) => {
 router.get('/tree/:containerId', authenticateToken, authorizeWorkspace, fileRateLimit, validateContainerId, async (req, res) => {
   try {
     const { containerId } = req.params;
-    const { path = '/workspace' } = req.query;
+    const { path: requestPath = '/workspace' } = req.query;
 
+    // Check if this is a simulated container
+    if (containerId.startsWith('sim_')) {
+      // Handle simulated container - read from host filesystem
+      const workspaceId = req.user.workspaceId;
+      const hostPath = path.join('/app/workspace', workspaceId);
+
+      try {
+        const tree = await buildHostFileTree(hostPath, requestPath);
+        res.json(tree);
+        return;
+      } catch (hostError) {
+        console.error('Error reading host filesystem:', hostError);
+        res.status(500).json({ error: 'Failed to read workspace directory' });
+        return;
+      }
+    }
+
+    // Handle real Docker container
     const container = docker.getContainer(containerId);
 
     // Execute ls -la command to get detailed directory listing
     const exec = await container.exec({
-      Cmd: ['find', path, '-maxdepth', '4', '-exec', 'ls', '-ld', '{}', ';'],
+      Cmd: ['find', requestPath, '-maxdepth', '4', '-exec', 'ls', '-ld', '{}', ';'],
       AttachStdout: true,
       AttachStderr: true
     });
@@ -155,7 +174,7 @@ router.get('/tree/:containerId', authenticateToken, authorizeWorkspace, fileRate
 
     // Parse the output into a tree structure with metadata
     const lines = output.trim().split('\n').filter(line => line.trim());
-    const tree = buildTreeStructureWithMetadata(lines, path);
+    const tree = buildTreeStructureWithMetadata(lines, requestPath);
 
     res.json(tree);
   } catch (error) {
@@ -276,22 +295,44 @@ function buildTreeStructureWithMetadata(lsOutput, rootPath) {
 }
 
 // Read file content
-router.get('/content/:containerId', authenticateToken, authorizeWorkspace, async (req, res) => {
+router.get('/content/:containerId', authenticateToken, authorizeWorkspace, validateContainerId, async (req, res) => {
   try {
     const { containerId } = req.params;
-    const { path } = req.query;
-    
-    if (!path) {
+    const { path: filePath } = req.query;
+
+    if (!filePath) {
       return res.status(400).json({ error: 'File path is required' });
     }
-    
+
+    // Check if this is a simulated container
+    if (containerId.startsWith('sim_')) {
+      // Handle simulated container - read from host filesystem
+      const workspaceId = req.user.workspaceId;
+      const hostWorkspaceDir = path.join('/app/workspace', workspaceId);
+
+      // Convert workspace path to host path
+      const relativePath = filePath.replace('/workspace/', '').replace('/workspace', '');
+      const fullHostPath = path.join(hostWorkspaceDir, relativePath);
+
+      try {
+        const content = await fs.readFile(fullHostPath, 'utf8');
+        res.json({ content, path: filePath });
+        return;
+      } catch (hostError) {
+        console.error('Error reading file from host:', hostError);
+        res.status(500).json({ error: 'Failed to read file' });
+        return;
+      }
+    }
+
+    // Handle real Docker container
     const container = docker.getContainer(containerId);
-    
+
     // Get file from container using tar
-    const tarStream = await container.getArchive({ path });
+    const tarStream = await container.getArchive({ path: filePath });
     const content = await extractFromTar(tarStream);
-    
-    res.json({ content, path });
+
+    res.json({ content, path: filePath });
   } catch (error) {
     console.error('Error reading file:', error);
     res.status(500).json({ error: 'Failed to read file' });
@@ -299,29 +340,56 @@ router.get('/content/:containerId', authenticateToken, authorizeWorkspace, async
 });
 
 // Write file content
-router.post('/content/:containerId', authenticateToken, authorizeWorkspace, async (req, res) => {
+router.post('/content/:containerId', authenticateToken, authorizeWorkspace, validateContainerId, async (req, res) => {
   try {
     const { containerId } = req.params;
-    const { path, content } = req.body;
-    
-    if (!path || content === undefined) {
+    const { path: filePath, content } = req.body;
+
+    if (!filePath || content === undefined) {
       return res.status(400).json({ error: 'File path and content are required' });
     }
-    
+
+    // Check if this is a simulated container
+    if (containerId.startsWith('sim_')) {
+      // Handle simulated container - write to host filesystem
+      const workspaceId = req.user.workspaceId;
+      const hostWorkspaceDir = path.join('/app/workspace', workspaceId);
+
+      // Convert workspace path to host path
+      const relativePath = filePath.replace('/workspace/', '').replace('/workspace', '');
+      const fullHostPath = path.join(hostWorkspaceDir, relativePath);
+
+      try {
+        // Ensure directory exists
+        const directory = path.dirname(fullHostPath);
+        await fs.mkdir(directory, { recursive: true });
+
+        // Write file content
+        await fs.writeFile(fullHostPath, content);
+        res.json({ message: 'File saved successfully', path: filePath });
+        return;
+      } catch (hostError) {
+        console.error('Error writing file to host:', hostError);
+        res.status(500).json({ error: 'Failed to write file' });
+        return;
+      }
+    }
+
+    // Handle real Docker container
     const container = docker.getContainer(containerId);
-    
+
     // Extract directory and filename
-    const pathParts = path.split('/');
+    const pathParts = filePath.split('/');
     const filename = pathParts.pop();
     const directory = pathParts.join('/') || '/';
-    
+
     // Create tar stream with file content
     const tarStream = createTarStream(filename, content);
-    
+
     // Upload file to container
     await container.putArchive(tarStream, { path: directory });
-    
-    res.json({ message: 'File saved successfully', path });
+
+    res.json({ message: 'File saved successfully', path: filePath });
   } catch (error) {
     console.error('Error writing file:', error);
     res.status(500).json({ error: 'Failed to write file' });
@@ -329,36 +397,67 @@ router.post('/content/:containerId', authenticateToken, authorizeWorkspace, asyn
 });
 
 // Create new file
-router.post('/create/:containerId', authenticateToken, authorizeWorkspace, async (req, res) => {
+router.post('/create/:containerId', authenticateToken, authorizeWorkspace, validateContainerId, async (req, res) => {
   try {
     const { containerId } = req.params;
-    const { path, type = 'file', content = '' } = req.body;
-    
-    if (!path) {
+    const { path: filePath, type = 'file', content = '' } = req.body;
+
+    if (!filePath) {
       return res.status(400).json({ error: 'Path is required' });
     }
-    
+
+    // Check if this is a simulated container
+    if (containerId.startsWith('sim_')) {
+      // Handle simulated container - create on host filesystem
+      const workspaceId = req.user.workspaceId;
+      const hostWorkspaceDir = path.join('/app/workspace', workspaceId);
+
+      // Convert workspace path to host path
+      const relativePath = filePath.replace('/workspace/', '').replace('/workspace', '');
+      const fullHostPath = path.join(hostWorkspaceDir, relativePath);
+
+      try {
+        if (type === 'directory') {
+          // Create directory
+          await fs.mkdir(fullHostPath, { recursive: true });
+        } else {
+          // Create file
+          const directory = path.dirname(fullHostPath);
+          await fs.mkdir(directory, { recursive: true });
+          await fs.writeFile(fullHostPath, content);
+        }
+
+        res.json({ message: `${type} created successfully`, path: filePath });
+        return;
+      } catch (hostError) {
+        console.error('Error creating file on host:', hostError);
+        res.status(500).json({ error: `Failed to create ${type}` });
+        return;
+      }
+    }
+
+    // Handle real Docker container
     const container = docker.getContainer(containerId);
-    
+
     if (type === 'directory') {
       // Create directory
       const exec = await container.exec({
-        Cmd: ['mkdir', '-p', path],
+        Cmd: ['mkdir', '-p', filePath],
         AttachStdout: true,
         AttachStderr: true
       });
       await exec.start();
     } else {
       // Create file
-      const pathParts = path.split('/');
+      const pathParts = filePath.split('/');
       const filename = pathParts.pop();
       const directory = pathParts.join('/') || '/';
-      
+
       const tarStream = createTarStream(filename, content);
       await container.putArchive(tarStream, { path: directory });
     }
-    
-    res.json({ message: `${type} created successfully`, path });
+
+    res.json({ message: `${type} created successfully`, path: filePath });
   } catch (error) {
     console.error('Error creating file/directory:', error);
     res.status(500).json({ error: `Failed to create ${type}` });
@@ -366,26 +465,55 @@ router.post('/create/:containerId', authenticateToken, authorizeWorkspace, async
 });
 
 // Delete file or directory
-router.delete('/delete/:containerId', authenticateToken, authorizeWorkspace, async (req, res) => {
+router.delete('/delete/:containerId', authenticateToken, authorizeWorkspace, validateContainerId, async (req, res) => {
   try {
     const { containerId } = req.params;
-    const { path } = req.body;
-    
-    if (!path) {
+    const { path: filePath } = req.body;
+
+    if (!filePath) {
       return res.status(400).json({ error: 'Path is required' });
     }
-    
+
+    // Check if this is a simulated container
+    if (containerId.startsWith('sim_')) {
+      // Handle simulated container - delete from host filesystem
+      const workspaceId = req.user.workspaceId;
+      const hostWorkspaceDir = path.join('/app/workspace', workspaceId);
+
+      // Convert workspace path to host path
+      const relativePath = filePath.replace('/workspace/', '').replace('/workspace', '');
+      const fullHostPath = path.join(hostWorkspaceDir, relativePath);
+
+      try {
+        // Check if it's a file or directory
+        const stats = await fs.stat(fullHostPath);
+        if (stats.isDirectory()) {
+          await fs.rmdir(fullHostPath, { recursive: true });
+        } else {
+          await fs.unlink(fullHostPath);
+        }
+
+        res.json({ message: 'File/directory deleted successfully', path: filePath });
+        return;
+      } catch (hostError) {
+        console.error('Error deleting file from host:', hostError);
+        res.status(500).json({ error: 'Failed to delete file/directory' });
+        return;
+      }
+    }
+
+    // Handle real Docker container
     const container = docker.getContainer(containerId);
-    
+
     const exec = await container.exec({
-      Cmd: ['rm', '-rf', path],
+      Cmd: ['rm', '-rf', filePath],
       AttachStdout: true,
       AttachStderr: true
     });
-    
+
     await exec.start();
-    
-    res.json({ message: 'File/directory deleted successfully', path });
+
+    res.json({ message: 'File/directory deleted successfully', path: filePath });
   } catch (error) {
     console.error('Error deleting file/directory:', error);
     res.status(500).json({ error: 'Failed to delete file/directory' });
@@ -474,7 +602,7 @@ router.post('/copy/:containerId', authenticateToken, authorizeWorkspace, async (
 });
 
 // Execute file (run file in terminal)
-router.post('/execute/:containerId', authenticateToken, authorizeWorkspace, async (req, res) => {
+router.post('/execute/:containerId', authenticateToken, authorizeWorkspace, validateContainerId, async (req, res) => {
   try {
     const { containerId } = req.params;
     const { filePath, workingDir = '/workspace' } = req.body;
@@ -483,9 +611,37 @@ router.post('/execute/:containerId', authenticateToken, authorizeWorkspace, asyn
       return res.status(400).json({ error: 'File path is required' });
     }
 
-    const container = docker.getContainer(containerId);
     const fileName = path.basename(filePath);
     const fileExt = path.extname(fileName).toLowerCase();
+
+    // Check if this is a simulated container
+    if (containerId.startsWith('sim_')) {
+      // Handle simulated container - execute on host filesystem
+      const workspaceId = req.user.workspaceId;
+      const hostWorkspaceDir = path.join('/app/workspace', workspaceId);
+
+      // Convert workspace path to host path
+      const relativePath = filePath.replace('/workspace/', '').replace('/workspace', '');
+      const fullHostPath = path.join(hostWorkspaceDir, relativePath);
+
+      try {
+        const result = await executeFileOnHost(fullHostPath, fileExt, hostWorkspaceDir);
+        res.json({
+          message: 'File executed successfully',
+          filePath,
+          command: result.command,
+          output: result.output
+        });
+        return;
+      } catch (hostError) {
+        console.error('Error executing file on host:', hostError);
+        res.status(500).json({ error: 'Failed to execute file: ' + hostError.message });
+        return;
+      }
+    }
+
+    // Handle real Docker container
+    const container = docker.getContainer(containerId);
 
     let command = [];
 
@@ -547,5 +703,141 @@ router.post('/execute/:containerId', authenticateToken, authorizeWorkspace, asyn
     res.status(500).json({ error: 'Failed to execute file', details: error.message });
   }
 });
+
+// Helper function to build file tree from host filesystem
+const buildHostFileTree = async (hostPath, requestPath = '/workspace') => {
+
+  try {
+    // Read directory contents
+    const entries = await fs.readdir(hostPath, { withFileTypes: true });
+
+    const tree = [];
+    let id = 1;
+
+    for (const entry of entries) {
+      const fullPath = path.join(hostPath, entry.name);
+      const stats = await fs.stat(fullPath);
+
+      const node = {
+        id: id++,
+        text: entry.name,
+        data: {
+          path: path.join(requestPath, entry.name),
+          type: entry.isDirectory() ? 'directory' : 'file',
+          size: entry.isDirectory() ? null : stats.size,
+          permissions: stats.mode.toString(8).slice(-3),
+          fileType: entry.isDirectory() ? 'folder' : getFileType(entry.name),
+          icon: getFileIcon(entry.name, entry.isDirectory()),
+          executable: !entry.isDirectory() && isExecutableFile(entry.name),
+          modified: stats.mtime.toISOString()
+        },
+        children: []
+      };
+
+      // If it's a directory, recursively get children (limit depth)
+      if (entry.isDirectory() && requestPath.split('/').length < 6) {
+        try {
+          const childTree = await buildHostFileTree(fullPath, path.join(requestPath, entry.name));
+          node.children = childTree;
+          node.droppable = true;
+        } catch (childError) {
+          console.error(`Error reading subdirectory ${fullPath}:`, childError);
+          // Continue with empty children
+        }
+      }
+
+      tree.push(node);
+    }
+
+    return tree;
+  } catch (error) {
+    console.error('Error building host file tree:', error);
+    throw error;
+  }
+};
+
+// Helper function to execute files on host filesystem
+const executeFileOnHost = async (filePath, fileExt, workingDir) => {
+  const { spawn } = await import('child_process');
+
+  let command = [];
+  let commandString = '';
+
+  // Determine execution command based on file type
+  switch (fileExt) {
+    case '.py':
+      command = ['python3', filePath];
+      commandString = `python3 ${path.basename(filePath)}`;
+      break;
+    case '.js':
+      command = ['node', filePath];
+      commandString = `node ${path.basename(filePath)}`;
+      break;
+    case '.java':
+      // Compile and run Java file
+      const className = path.basename(filePath, '.java');
+      command = ['sh', '-c', `cd ${workingDir} && javac ${path.basename(filePath)} && java ${className}`];
+      commandString = `javac ${path.basename(filePath)} && java ${className}`;
+      break;
+    case '.sh':
+      command = ['sh', filePath];
+      commandString = `sh ${path.basename(filePath)}`;
+      break;
+    case '.bat':
+      command = ['sh', filePath]; // Convert to sh for Unix containers
+      commandString = `sh ${path.basename(filePath)}`;
+      break;
+    default:
+      throw new Error(`Unsupported file type: ${fileExt}`);
+  }
+
+  return new Promise((resolve, reject) => {
+    const process = spawn(command[0], command.slice(1), {
+      cwd: workingDir,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+
+    let output = '';
+    let errorOutput = '';
+
+    process.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+
+    process.stderr.on('data', (data) => {
+      errorOutput += data.toString();
+    });
+
+    process.on('close', (code) => {
+      const finalOutput = output + (errorOutput ? '\nErrors:\n' + errorOutput : '');
+      resolve({
+        command: commandString,
+        output: finalOutput.trim() || `Process exited with code ${code}`,
+        exitCode: code
+      });
+    });
+
+    process.on('error', (error) => {
+      // Handle missing interpreter gracefully
+      if (error.code === 'ENOENT') {
+        resolve({
+          command: commandString,
+          output: `Error: ${command[0]} is not installed in this environment.\nSupported languages: JavaScript (.js), Shell scripts (.sh)`,
+          exitCode: 127
+        });
+      } else {
+        reject(new Error(`Failed to execute command: ${error.message}`));
+      }
+    });
+
+    // Set a timeout to prevent hanging
+    setTimeout(() => {
+      if (!process.killed) {
+        process.kill();
+        reject(new Error('Command execution timeout'));
+      }
+    }, 30000); // 30 second timeout
+  });
+};
 
 export default router;

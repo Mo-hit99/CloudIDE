@@ -257,7 +257,11 @@ const EnhancedFolderTree = ({ containerId, onSelect, onError, onExecute }) => {
   const [selectedNode, setSelectedNode] = useState(null);
 
   const loadDirectoryTree = useCallback(async (path = selectedPath) => {
-    if (!containerId) return;
+    if (!containerId) {
+      console.warn('No container ID provided to EnhancedFolderTree');
+      setTreeData([]);
+      return;
+    }
 
     setLoading(true);
     try {
@@ -265,6 +269,7 @@ const EnhancedFolderTree = ({ containerId, onSelect, onError, onExecute }) => {
       setTreeData(response.data);
     } catch (error) {
       const errorMessage = handleAPIError(error);
+      console.error('Error loading directory tree:', errorMessage);
       onError?.(errorMessage);
     } finally {
       setLoading(false);

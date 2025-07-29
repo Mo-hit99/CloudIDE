@@ -62,17 +62,29 @@ export const authorizeWorkspace = (req, res, next) => {
     const userContainerId = req.user.containerId;
     const userWorkspaceId = req.user.workspaceId;
 
+    // If user doesn't have a container yet, allow access to create one
+    if (!userContainerId && !containerId) {
+      console.log(`User ${req.user.username} doesn't have a container yet, allowing access to create one`);
+      return next();
+    }
+
     // Check container access
     if (containerId && containerId !== userContainerId) {
       return res.status(403).json({
-        error: 'Access denied: You do not have permission to access this container'
+        error: 'Access denied: You do not have permission to access this container',
+        details: 'Container ID does not match your assigned container',
+        userContainer: userContainerId,
+        requestedContainer: containerId
       });
     }
 
     // Check workspace access
     if (workspaceId && workspaceId !== userWorkspaceId) {
       return res.status(403).json({
-        error: 'Access denied: You do not have permission to access this workspace'
+        error: 'Access denied: You do not have permission to access this workspace',
+        details: 'Workspace ID does not match your assigned workspace',
+        userWorkspace: userWorkspaceId,
+        requestedWorkspace: workspaceId
       });
     }
 
@@ -123,11 +135,34 @@ export const optionalAuth = async (req, res, next) => {
 export const ensureContainer = async (req, res, next) => {
   try {
     if (!req.user.containerId) {
-      return res.status(400).json({
-        error: 'User container not available. Please contact support.'
-      });
+      // Try to automatically create a container for the user
+      console.log(`User ${req.user.username} doesn't have a container, attempting to create one...`);
+
+      try {
+        const { createUserContainer } = await import('../services/containerService.js');
+        const containerId = await createUserContainer(req.user.workspaceId);
+
+        // Update user with new container ID
+        const User = (await import('../models/User.js')).default;
+        await User.findByIdAndUpdate(req.user.userId, { containerId });
+
+        // Update the request user object
+        req.user.containerId = containerId;
+
+        console.log(`Container created automatically for user ${req.user.username}: ${containerId}`);
+        next();
+      } catch (containerError) {
+        console.error('Failed to auto-create container:', containerError);
+        return res.status(400).json({
+          error: 'User container not available',
+          details: 'Your workspace container could not be created automatically. Please try creating it manually.',
+          action: 'create_container',
+          endpoint: '/api/auth/create-container'
+        });
+      }
+    } else {
+      next();
     }
-    next();
   } catch (error) {
     console.error('Container check error:', error);
     res.status(500).json({

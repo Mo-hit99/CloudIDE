@@ -108,6 +108,21 @@ class AuthAPI {
     }
   }
 
+  // Create container for user
+  async createContainer() {
+    try {
+      const response = await fetch(`${this.baseURL}/create-container`, {
+        method: 'POST',
+        headers: this.getAuthHeaders()
+      });
+
+      return await this.handleResponse(response);
+    } catch (error) {
+      console.error('Create container error:', error);
+      throw error;
+    }
+  }
+
   // Logout user
   async logout() {
     try {

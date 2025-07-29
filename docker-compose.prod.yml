@@ -1,25 +1,45 @@
-# Production configuration with security hardening
 version: '3.9'
 
+# ☁️ Cloud IDE - Production Environment
+# Production configuration with Nginx, Frontend, Backend, and MongoDB
+
 services:
-  # MongoDB Database - Production configuration
+  # 🌐 Nginx - Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: cloud-ide-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - frontend-dist:/usr/share/nginx/html:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - cloud-ide-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 🍃 MongoDB Database
   mongo:
     image: mongo:8.0
     container_name: cloud-ide-mongo-prod
-    restart: always
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+      - mongo-config:/data/configdb
     environment:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
       - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-cloudIDE}
-    volumes:
-      - mongo-data-prod:/data/db
-      - mongo-config-prod:/data/configdb
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    command: ["mongod", "--auth", "--bind_ip_all", "--wiredTigerCacheSizeGB", "0.5"]
+    command: ["mongod", "--auth", "--bind_ip_all"]
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 30s
@@ -28,21 +48,15 @@ services:
       start_period: 60s
     networks:
       - cloud-ide-network
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: '0.5'
 
-  # Backend API Server - Production
+  # 🟢 Backend API Server
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-      args:
-        - NODE_VERSION=18-alpine
+      target: production
     container_name: cloud-ide-backend-prod
-    restart: always
+    restart: unless-stopped
     privileged: true
     expose:
       - "5000"
@@ -53,126 +67,60 @@ services:
         condition: service_healthy
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - workspace-data:/app/workspace
+      - logs-data:/app/logs
     environment:
       - NODE_ENV=production
       - MONGO_URI=mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongo:27017/${MONGO_INITDB_DATABASE:-cloudIDE}?authSource=admin
       - DOCKER_HOST=unix:///var/run/docker.sock
       - JWT_SECRET=${JWT_SECRET}
-      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
-      - LOG_LEVEL=warn
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
+      - LOG_LEVEL=${LOG_LEVEL:-warn}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:5000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 60s
     networks:
       - cloud-ide-network
 
-  # Frontend with production build
+  # ⚛️ Frontend React Application
   frontend:
-    restart: always
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        - NODE_VERSION=18-alpine
+      target: production
     container_name: cloud-ide-frontend-prod
+    restart: unless-stopped
+    volumes:
+      - frontend-dist:/app/dist
     environment:
       - NODE_ENV=production
-      - VITE_API_URL=https://${DOMAIN:-localhost}/api
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:80"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    depends_on:
-      backend:
-        condition: service_healthy
+      - VITE_API_URL=/api
     networks:
       - cloud-ide-network
 
-  # Redis for session management and caching (optional)
-  redis:
-    image: redis:7.4-alpine
-    container_name: cloud-ide-redis-prod
-    restart: always
-    volumes:
-      - redis-data:/data
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-defaultpassword}
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    healthcheck:
-      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD:-defaultpassword}", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    networks:
-      - cloud-ide-network
-    profiles:
-      - cache
-
-  # Nginx reverse proxy for production
-  nginx:
-    image: nginx:1.27-alpine
-    container_name: cloud-ide-nginx-prod
-    restart: always
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
-      - nginx-logs:/var/log/nginx
-    depends_on:
-      - frontend
-      - backend
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    networks:
-      - cloud-ide-network
-
+# 💾 Volumes
 volumes:
-  mongo-data-prod:
+  mongo-data:
     driver: local
     name: cloud-ide-mongo-data-prod
-  mongo-config-prod:
+  mongo-config:
     driver: local
     name: cloud-ide-mongo-config-prod
-  redis-data:
+  workspace-data:
     driver: local
-    name: cloud-ide-redis-data-prod
-  nginx-logs:
+    name: cloud-ide-workspace-prod
+  logs-data:
     driver: local
-    name: cloud-ide-nginx-logs-prod
+    name: cloud-ide-logs-prod
+  frontend-dist:
+    driver: local
+    name: cloud-ide-frontend-dist-prod
 
-# Custom network for service communication
+# 🌐 Network
 networks:
   cloud-ide-network:
     driver: bridge
     name: cloud-ide-network-prod
-    ipam:
-      config:
-        - subnet: 172.21.0.0/16

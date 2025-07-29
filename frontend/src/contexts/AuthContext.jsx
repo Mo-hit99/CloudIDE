@@ -159,15 +159,29 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await authAPI.login(credentials);
 
+      // Check if user has a container, if not create one
+      let userWithContainer = response.user;
+      if (!response.user.containerId) {
+        console.log('User does not have a container, creating one...');
+        try {
+          const containerResponse = await authAPI.createContainer();
+          userWithContainer = containerResponse.user;
+          console.log('Container created successfully:', containerResponse.containerId);
+        } catch (containerError) {
+          console.error('Failed to create container:', containerError);
+          // Continue with login even if container creation fails
+        }
+      }
+
       dispatch({
         type: AUTH_ACTIONS.LOGIN_SUCCESS,
         payload: {
-          user: response.user,
+          user: userWithContainer,
           token: response.token
         }
       });
 
-      return response;
+      return { ...response, user: userWithContainer };
     } catch (error) {
       dispatch({
         type: AUTH_ACTIONS.LOGIN_FAILURE,

@@ -20,28 +20,22 @@ services:
       - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-cloudIDE}
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
+      interval: 30s
+      timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 40s
     networks:
       - cloud-ide-network
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: '0.5'
 
-  # 🟢 Backend API Server - Node.js with Express and Docker integration
+  # 🟢 Backend API Server
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-      args:
-        - NODE_VERSION=18-alpine
+      target: development
     container_name: cloud-ide-backend
     restart: unless-stopped
-    privileged: true  # Required for Docker socket access and container management
+    privileged: true
     ports:
       - "${BACKEND_PORT:-5000}:5000"
     env_file:
@@ -52,38 +46,31 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
-      # Docker socket mounting for container management
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./workspace:/app/workspace
     environment:
       - MONGO_URI=mongodb://${MONGO_INITDB_ROOT_USERNAME:-admin}:${MONGO_INITDB_ROOT_PASSWORD:-password123}@mongo:27017/${MONGO_INITDB_DATABASE:-cloudIDE}?authSource=admin
-      - NODE_ENV=${NODE_ENV:-development}
+      - NODE_ENV=development
       - FRONTEND_URL=http://localhost:${FRONTEND_PORT:-5173}
       - DOCKER_HOST=unix:///var/run/docker.sock
-      - JWT_SECRET=${JWT_SECRET:-your-development-secret-key}
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-key}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
-      - LOG_LEVEL=${LOG_LEVEL:-info}
-      - CORS_ORIGINS=http://localhost:${FRONTEND_PORT:-5173}
+      - LOG_LEVEL=${LOG_LEVEL:-debug}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:5000/health"]
-      interval: 10s
-      timeout: 5s
+      interval: 30s
+      timeout: 10s
       retries: 3
-      start_period: 15s
+      start_period: 40s
     networks:
       - cloud-ide-network
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: '0.5'
 
-  # ⚛️ Frontend React Application - Beautiful responsive UI with Vite
+  # ⚛️ Frontend React Application
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        - NODE_VERSION=18-alpine
+      target: development
     container_name: cloud-ide-frontend
     restart: unless-stopped
     ports:
@@ -96,50 +83,31 @@ services:
       - /app/node_modules
     environment:
       - VITE_API_URL=http://localhost:${BACKEND_PORT:-5000}
-      - NODE_ENV=${NODE_ENV:-development}
+      - NODE_ENV=development
       - VITE_APP_NAME=Cloud IDE
       - VITE_APP_VERSION=2.0.0
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:5173"]
-      interval: 15s
-      timeout: 5s
+      interval: 30s
+      timeout: 10s
       retries: 3
-      start_period: 20s
+      start_period: 40s
     networks:
       - cloud-ide-network
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.25'
 
 
 
-# 💾 Named volumes for persistent data storage
+# 💾 Volumes
 volumes:
   mongo-data:
     driver: local
-    name: cloud-ide-mongo-data
-    labels:
-      - "cloud-ide.volume=database"
-      - "cloud-ide.environment=development"
+    name: cloud-ide-mongo-data-dev
   mongo-config:
     driver: local
-    name: cloud-ide-mongo-config
-    labels:
-      - "cloud-ide.volume=database-config"
-      - "cloud-ide.environment=development"
+    name: cloud-ide-mongo-config-dev
 
-# 🌐 Custom network for secure service communication
+# 🌐 Network
 networks:
   cloud-ide-network:
     driver: bridge
-    name: cloud-ide-network
-    labels:
-      - "cloud-ide.network=main"
-      - "cloud-ide.environment=development"
-    ipam:
-      driver: default
-      config:
-        - subnet: 172.20.0.0/16
-          gateway: 172.20.0.1
+    name: cloud-ide-network-dev

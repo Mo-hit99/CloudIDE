@@ -27,16 +27,22 @@ export const terminalRateLimit = createRateLimit(1 * 60 * 1000, 1000); // Increa
 export const validateContainerId = (req, res, next) => {
   const { containerId, id } = req.params;
   const containerIdToValidate = containerId || id;
-  
+
   if (!containerIdToValidate) {
     return res.status(400).json({ error: 'Container ID is required' });
   }
-  
-  // Basic container ID format validation (Docker container IDs are 64 character hex strings)
-  if (!/^[a-f0-9]{12,64}$/i.test(containerIdToValidate)) {
-    return res.status(400).json({ error: 'Invalid container ID format' });
+
+  // Validate container ID format - support both Docker IDs and simulated IDs
+  const isDockerFormat = /^[a-f0-9]{12,64}$/i.test(containerIdToValidate);
+  const isSimulatedFormat = /^sim_/.test(containerIdToValidate);
+
+  if (!isDockerFormat && !isSimulatedFormat) {
+    return res.status(400).json({
+      error: 'Invalid container ID format',
+      details: 'Container ID must be either a Docker container ID or a simulated workspace ID'
+    });
   }
-  
+
   next();
 };
 
