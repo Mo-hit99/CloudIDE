@@ -31,16 +31,24 @@ CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
 # Build stage
 FROM node:${NODE_VERSION} as build
 
+# Accept build arguments
+ARG VITE_API_URL=""
+ARG NODE_ENV=production
+
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --silent
+# Install dependencies (including devDependencies for build)
+RUN npm ci --silent --include=dev
 
 # Copy source code
 COPY . .
+
+# Set environment variables for build
+ENV VITE_API_URL=${VITE_API_URL}
+ENV NODE_ENV=${NODE_ENV}
 
 # Build the application
 RUN npm run build

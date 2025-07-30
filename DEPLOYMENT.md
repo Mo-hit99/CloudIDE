@@ -23,15 +23,49 @@ docker-compose up -d
 ### Production Environment
 
 ```bash
-# Build production images
+# Build production images with correct API configuration
 docker build -t cloud-ide-backend-prod:latest ./backend --target production
-docker build -t cloud-ide-frontend-prod:latest ./frontend --target production
+docker build -t cloud-ide-frontend-prod:latest ./frontend --target production --build-arg VITE_API_URL=""
 
 # Start production services
 docker-compose -f docker-compose.prod.yml up -d
 
+# Note: The frontend automatically replaces hardcoded API URLs at runtime
 # If backend fails to start, restart it with:
 docker-compose -f docker-compose.prod.yml up -d backend
+
+# If you see "Failed to fetch" errors in browser:
+# 1. Hard refresh the browser (Ctrl+F5 or Cmd+Shift+R)
+# 2. Clear browser cache and cookies
+# 3. Restart frontend container:
+docker-compose -f docker-compose.prod.yml up -d frontend
+
+# If you see "500 Internal Server Error" or CORS errors:
+# 1. Check backend logs: docker logs cloud-ide-backend-prod
+# 2. Restart backend container:
+docker-compose -f docker-compose.prod.yml up -d backend
+
+# If you see "404 Not Found" or "Unexpected token '<'" errors:
+# 1. Check Nginx logs: docker logs cloud-ide-nginx-prod
+# 2. Restart frontend container to fix API URLs:
+docker-compose -f docker-compose.prod.yml up -d frontend
+# 3. Force browser cache refresh with Ctrl+F5 or Cmd+Shift+R
+
+# If you see "Failed to fetch" or "ERR_CONNECTION_REFUSED" errors:
+# This usually means browser cache is loading old JavaScript files
+# 1. Clear browser cache completely (Ctrl+Shift+Delete)
+# 2. Try incognito/private browsing mode
+# 3. Force complete frontend refresh:
+docker-compose -f docker-compose.prod.yml down frontend
+docker exec cloud-ide-nginx-prod sh -c "rm -rf /usr/share/nginx/html/assets/* && rm -f /usr/share/nginx/html/index.html"
+docker-compose -f docker-compose.prod.yml up -d frontend
+
+# If you see "Unexpected string" or JavaScript syntax errors:
+# This means the frontend was built with incorrect configuration
+# 1. Rebuild frontend image with correct build args:
+docker build -t cloud-ide-frontend-prod:latest ./frontend --target production --build-arg VITE_API_URL=""
+# 2. Restart frontend container:
+docker-compose -f docker-compose.prod.yml up -d frontend
 ```
 
 

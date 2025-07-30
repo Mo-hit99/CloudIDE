@@ -13,7 +13,7 @@ services:
     volumes:
       - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
-      - frontend-dist:/usr/share/nginx/html:ro
+      - frontend-dist:/usr/share/nginx/html
     depends_on:
       - frontend
       - backend
@@ -68,11 +68,13 @@ services:
       - logs-data:/app/logs
     environment:
       - NODE_ENV=production
-      - MONGO_URI=mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongo:27017/${MONGO_INITDB_DATABASE:-cloudIDE}?authSource=admin
+      - MONGO_URI=mongodb://admin:password123@mongo:27017/cloudIDE?authSource=admin
       - DOCKER_HOST=unix:///var/run/docker.sock
-      - JWT_SECRET=${JWT_SECRET}
-      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
-      - LOG_LEVEL=${LOG_LEVEL:-warn}
+      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+      - JWT_EXPIRES_IN=24h
+      - LOG_LEVEL=debug
+      - FRONTEND_URL=http://localhost
+      - PORT=5000
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:5000/health"]
       interval: 30s
@@ -87,11 +89,19 @@ services:
     image: cloud-ide-frontend-prod:latest
     container_name: cloud-ide-frontend-prod
     restart: unless-stopped
+    command: ["sh", "-c", "
+      echo 'Starting frontend with clean build...' &&
+      cp -r /app/dist/* /usr/share/nginx/html/ &&
+      TIMESTAMP=$(date +%s) &&
+      sed -i \"s|/assets/index-\\([^.]*\\)\\.js|/assets/index-\\1.js?v=$TIMESTAMP|g\" /usr/share/nginx/html/index.html &&
+      echo 'Frontend files prepared successfully' &&
+      serve -s dist -l 5173
+    "]
     volumes:
-      - frontend-dist:/app/dist
+      - frontend-dist:/usr/share/nginx/html
     environment:
       - NODE_ENV=production
-      - VITE_API_URL=/api
+      - VITE_API_URL=
     networks:
       - cloud-ide-network
 
