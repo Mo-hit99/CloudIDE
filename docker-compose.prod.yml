@@ -51,6 +51,7 @@ services:
   backend:
     image: cloud-ide-backend-prod:latest
     container_name: cloud-ide-backend-prod
+    entrypoint: [""]
     command: ["node", "index.js"]
     restart: unless-stopped
     privileged: true

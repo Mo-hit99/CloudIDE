@@ -29,6 +29,9 @@ docker build -t cloud-ide-frontend-prod:latest ./frontend --target production
 
 # Start production services
 docker-compose -f docker-compose.prod.yml up -d
+
+# If backend fails to start, restart it with:
+docker-compose -f docker-compose.prod.yml up -d backend
 ```
 
 
