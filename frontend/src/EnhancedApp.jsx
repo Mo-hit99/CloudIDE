@@ -6,6 +6,8 @@ import EnhancedTerminal from './Components/EnhancedTerminal';
 import WorkspaceManager from './Components/WorkspaceManager';
 import './styles/scrollbar.css';
 import './styles/responsive.css';
+import './styles/glass-effect.css';
+import './styles/enhanced-ui.css';
 
 const EnhancedApp = () => {
   const [containers, setContainers] = useState([]);
@@ -16,6 +18,8 @@ const EnhancedApp = () => {
   const [error, setError] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showWorkspaceManager, setShowWorkspaceManager] = useState(false);
+  const [fileExplorerCollapsed, setFileExplorerCollapsed] = useState(false);
+  const [terminalCollapsed, setTerminalCollapsed] = useState(false);
 
   // Load containers on component mount
   useEffect(() => {
@@ -84,9 +88,9 @@ const EnhancedApp = () => {
       darkMode ? 'dark bg-gray-900' : 'bg-gray-100'
     }`}>
       {/* Header */}
-      <header className="flex-shrink-0 bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+      <header className="flex-shrink-0 glass-header sticky top-0 shadow-sm border-b border-gray-200/30 dark:border-gray-700/30">
         <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center space-x-4">
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
                 ☁️ Cloud IDE
@@ -116,10 +120,26 @@ const EnhancedApp = () => {
             </div>
 
             <div className="flex items-center space-x-4">
+              {/* File Explorer Toggle */}
+              <button
+                onClick={() => setFileExplorerCollapsed(!fileExplorerCollapsed)}
+                className="liquid-button text-sm"
+              >
+                {fileExplorerCollapsed ? '📂 Show Files' : '📁 Hide Files'}
+              </button>
+              
+              {/* Mobile File Explorer Toggle */}
+              <button
+                onClick={() => setFileExplorerCollapsed(!fileExplorerCollapsed)}
+                className="liquid-button text-sm md:hidden"
+              >
+                {fileExplorerCollapsed ? '📂 Show Files' : '📁 Hide Files'}
+              </button>
+              
               {/* Workspace Manager Toggle */}
               <button
                 onClick={() => setShowWorkspaceManager(!showWorkspaceManager)}
-                className="px-3 py-1 bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors text-sm"
+                className="liquid-button liquid-button-primary text-sm"
               >
                 🎯 Workspace
               </button>
@@ -127,7 +147,7 @@ const EnhancedApp = () => {
               {/* Refresh Button */}
               <button
                 onClick={loadContainers}
-                className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors text-sm"
+                className="liquid-button text-sm"
               >
                 🔄 Refresh
               </button>
@@ -135,7 +155,7 @@ const EnhancedApp = () => {
               {/* Dark Mode Toggle */}
               <button
                 onClick={toggleDarkMode}
-                className="p-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                className="liquid-button p-2 rounded-lg text-sm"
               >
                 {darkMode ? '☀️' : '🌙'}
               </button>
@@ -167,11 +187,14 @@ const EnhancedApp = () => {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 flex gap-4 p-6 overflow-hidden mobile-stack mobile-p-2 mobile-gap-2 min-h-0">
+      <div className={`flex-1 flex gap-4 p-6 overflow-auto mobile-stack mobile-p-2 mobile-gap-2 min-h-0 large-screen-layout mobile-scrollable ${fileExplorerCollapsed ? 'file-explorer-collapsed' : ''} ${terminalCollapsed ? 'terminal-collapsed' : ''}`} style={{ minHeight: '100vh' }}>
         {/* Left Sidebar */}
-        <div className="w-80 tablet-sidebar-narrow flex flex-col gap-4 min-h-0 mobile-full-width">
+        <div className={`${fileExplorerCollapsed ? 'w-0 overflow-hidden' : 'w-80'} tablet-sidebar-narrow flex flex-col gap-4 min-h-0 mobile-full-width large-sidebar-wide transition-all duration-300`}>
           {/* File Explorer */}
-          <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden min-h-0">
+          <div className={`flex-1 glass-effect glass-sidebar rounded-lg shadow-md overflow-auto min-h-0 file-tree-mobile mobile-file-explorer ${fileExplorerCollapsed ? 'collapsed' : ''}`}>
+            <div className="mobile-explorer-toggle" onClick={() => setFileExplorerCollapsed(!fileExplorerCollapsed)}>
+              {fileExplorerCollapsed ? '📂 Show Files' : '📁 Hide Files'}
+            </div>
             <EnhancedFolderTree
               containerId={selectedContainer?.id}
               onSelect={handleFileSelect}
@@ -183,7 +206,7 @@ const EnhancedApp = () => {
 
           {/* Workspace Manager */}
           {showWorkspaceManager && (
-            <div className="h-80 workspace-manager-tablet bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+            <div className="h-80 workspace-manager-tablet glass-effect rounded-lg shadow-md overflow-auto">
               <WorkspaceManager
                 containerId={selectedContainer?.id}
                 onError={handleError}
@@ -196,7 +219,7 @@ const EnhancedApp = () => {
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col gap-4 min-h-0 min-w-0 mobile-full-width">
           {/* Code Editor */}
-          <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden min-h-0">
+          <div className="flex-1 glass-effect glass-editor rounded-lg shadow-md overflow-auto min-h-0 code-editor-mobile large-code-editor" style={{ flex: '1 0 70%' }}>
             <EnhancedCodeEditor
               containerId={selectedContainer?.id}
               currentFile={currentFile}
@@ -209,7 +232,16 @@ const EnhancedApp = () => {
           </div>
 
           {/* Terminal */}
-          <div className="h-80 bg-gray-900 rounded-lg shadow-md overflow-hidden flex-shrink-0">
+          <div className={`glass-effect glass-terminal rounded-lg shadow-md overflow-auto min-h-0 terminal-mobile large-terminal ${terminalCollapsed ? 'collapsed' : ''}`} style={{ flex: '0 0 30%', minHeight: '150px' }}>
+            <div className="terminal-toggle flex justify-between items-center px-2 py-1 bg-gray-100/30 dark:bg-gray-800/30 border-b border-gray-200/30 dark:border-gray-700/30">
+              <span className="text-xs font-medium">Terminal</span>
+              <button 
+                onClick={() => setTerminalCollapsed(!terminalCollapsed)}
+                className="text-xs px-2 py-1 rounded hover:bg-gray-200/30 dark:hover:bg-gray-700/30"
+              >
+                {terminalCollapsed ? '▼ Expand' : '▲ Collapse'}
+              </button>
+            </div>
             <EnhancedTerminal
               containerId={selectedContainer?.id}
               darkMode={darkMode}
@@ -223,7 +255,7 @@ const EnhancedApp = () => {
       {/* No Container Selected */}
       {!selectedContainer && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-xl max-w-md w-full mx-4">
+          <div className="glass-effect glass-modal p-8 rounded-lg shadow-xl max-w-md w-full mx-4">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
               No Container Selected
             </h2>

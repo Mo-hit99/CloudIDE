@@ -5,6 +5,8 @@
   /* Mobile layout adjustments */
   .mobile-stack {
     flex-direction: column !important;
+    height: auto !important;
+    min-height: 100vh !important;
   }
   
   .mobile-full-width {
@@ -31,35 +33,110 @@
   /* File tree adjustments for mobile */
   .file-tree-mobile {
     font-size: 0.875rem;
+    max-height: 30vh !important; /* Limit height to give more space to code editor */
+    overflow-y: auto !important;
   }
   
   .file-tree-mobile .tree-node {
     padding: 0.75rem 0.5rem;
-    min-height: 40px;
+    min-height: 44px; /* Increased for better touch targets */
+  }
+  
+  /* File explorer container on mobile */
+  .mobile-file-explorer {
+    max-height: 30vh !important;
+    overflow-y: auto !important;
+    transition: max-height 0.3s ease-in-out !important;
+  }
+  
+  /* Collapsed file explorer */
+  .mobile-file-explorer.collapsed {
+    max-height: 44px !important; /* Just enough for the header */
+    overflow: hidden !important;
+  }
+  
+  /* Toggle button for file explorer */
+  .mobile-explorer-toggle {
+    display: none !important;
+  }
+  
+  @media (max-width: 640px) {
+    .mobile-explorer-toggle {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: 100% !important;
+      padding: 0.25rem !important;
+      background-color: rgba(0, 0, 0, 0.05) !important;
+      border-radius: 0 0 0.25rem 0.25rem !important;
+      font-size: 0.75rem !important;
+      cursor: pointer !important;
+    }
   }
   
   /* Code editor adjustments */
   .code-editor-mobile {
-    font-size: 14px;
+    font-size: 16px; /* Increased for better readability */
+    height: 75vh !important; /* Ensure code editor takes up more space */
+    min-height: 400px !important; /* Minimum height to ensure visibility */
+    display: flex !important; /* Ensure flex display */
+    flex-direction: column !important; /* Stack children vertically */
+    position: relative !important;
+    z-index: 10 !important;
+    margin-bottom: 1rem !important;
+  }
+  
+  /* When file explorer is collapsed, give even more space to editor */
+  .file-explorer-collapsed .code-editor-mobile {
+    height: 85vh !important;
+    min-height: 500px !important;
   }
   
   .code-editor-mobile .file-tab {
-    min-width: 80px;
-    max-width: 120px;
+    min-width: 100px;
+    max-width: 150px;
+    padding: 0.75rem 1rem;
+    height: 44px; /* Increased for better touch targets */
   }
   
   /* Terminal adjustments */
   .terminal-mobile {
-    font-size: 12px;
+    font-size: 14px; /* Increased for better readability */
+    height: 25vh !important; /* Reduced to balance with larger code editor */
+    min-height: 150px !important; /* Minimum height to ensure visibility */
+    display: flex !important; /* Ensure flex display */
+    flex-direction: column !important; /* Stack children vertically */
+    position: relative !important;
+    z-index: 10 !important;
+  }
+  
+  /* Add a collapsible terminal option */
+  .terminal-mobile.collapsed {
+    height: 44px !important; /* Just enough for the header */
+    min-height: 44px !important;
+    overflow: hidden !important;
+  }
+  
+  /* When terminal is collapsed, give more space to code editor */
+  .terminal-collapsed .code-editor-mobile {
+    height: 90vh !important;
   }
   
   .terminal-mobile .terminal-header {
-    padding: 0.5rem;
+    padding: 0.75rem;
+    height: 44px; /* Increased for better touch targets */
   }
   
   .terminal-mobile .quick-command {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    height: 44px; /* Increased for better touch targets */
+  }
+  
+  /* Ensure content is scrollable on small screens */
+  .mobile-scrollable {
+    overflow: auto !important;
+    -webkit-overflow-scrolling: touch;
   }
 }
 
@@ -87,6 +164,21 @@
   
   .large-text-base {
     font-size: 1rem !important;
+  }
+  
+  /* Larger code editor for large screens */
+  .large-code-editor {
+    font-size: 16px !important;
+  }
+  
+  /* Adjust layout for large screens */
+  .large-screen-layout {
+    gap: 1.5rem !important;
+  }
+  
+  /* Increase terminal height for large screens */
+  .large-terminal {
+    height: 400px !important;
   }
 }
 

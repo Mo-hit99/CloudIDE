@@ -322,9 +322,9 @@ const EnhancedCodeEditor = ({
   console.log('🎯 CodeEditor render - Open files:', openFiles.length, openFiles.map(f => f.text));
 
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-gray-800">
+    <div className="h-full flex flex-col" style={{ minHeight: '250px' }}>
       {/* File Tabs */}
-      <div className="flex-shrink-0 flex overflow-x-auto border-b border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700" style={{ scrollbarWidth: 'thin' }}>
+      <div className="flex-shrink-0 flex overflow-x-auto border-b border-gray-200/50 dark:border-gray-600/50 bg-gray-50/30 dark:bg-gray-700/30 tab-scroll" style={{ scrollbarWidth: 'thin' }}>
         {openFiles.map((file) => (
           <FileTab
             key={file.id}
@@ -348,7 +348,7 @@ const EnhancedCodeEditor = ({
 
       {/* Editor Toolbar */}
       {activeFile && (
-        <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+        <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-gray-50/30 dark:bg-gray-700/30 border-b border-gray-200/50 dark:border-gray-600/50">
           <div className="flex items-center space-x-4 min-w-0 flex-1">
             <span className="text-sm text-gray-600 dark:text-gray-300 truncate">
               {activeFile.data.path}

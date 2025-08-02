@@ -6,7 +6,6 @@ import EnhancedCodeEditor from './Components/EnhancedCodeEditor';
 import EnhancedTerminal from './Components/EnhancedTerminal';
 import WorkspaceManager from './Components/WorkspaceManager';
 import UserProfile from './Components/UserProfile';
-import { dockerAPI, handleAPIError } from './services/api';
 import './styles/scrollbar.css';
 import './styles/responsive.css';
 
@@ -27,6 +26,8 @@ function AuthenticatedApp() {
   const [showWorkspaceManager, setShowWorkspaceManager] = useState(false);
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [fileExplorerCollapsed, setFileExplorerCollapsed] = useState(false);
+  const [terminalCollapsed, setTerminalCollapsed] = useState(false);
   const terminalRef = useRef(null);
 
   // Apply dark mode class to html element
@@ -121,6 +122,22 @@ function AuthenticatedApp() {
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                   </svg>
+                </button>
+                
+                {/* Mobile File Explorer Toggle */}
+                <button
+                  onClick={() => setFileExplorerCollapsed(!fileExplorerCollapsed)}
+                  className="md:hidden p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 ml-1"
+                >
+                  {fileExplorerCollapsed ? (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
+                    </svg>
+                  )}
                 </button>
 
                 {/* Desktop Action Buttons */}
@@ -253,11 +270,14 @@ function AuthenticatedApp() {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 flex gap-4 p-6 overflow-hidden mobile-stack mobile-p-2 mobile-gap-2 min-h-0">
+      <div className={`flex-1 flex gap-4 p-6 mobile-stack mobile-p-2 mobile-gap-2 min-h-0 mobile-scrollable ${fileExplorerCollapsed ? 'file-explorer-collapsed' : ''} ${terminalCollapsed ? 'terminal-collapsed' : ''}`} style={{ minHeight: '100vh' }}>
         {/* Left Sidebar */}
-        <div className="w-80 tablet-sidebar-narrow flex flex-col gap-4 min-h-0 mobile-full-width">
+        <div className={`${fileExplorerCollapsed ? 'w-0 overflow-hidden' : 'w-80'} tablet-sidebar-narrow flex flex-col gap-4 min-h-0 mobile-full-width transition-all duration-300`}>
           {/* File Explorer */}
-          <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden min-h-0">
+          <div className={`flex-1 bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden min-h-0 file-tree-mobile mobile-file-explorer ${fileExplorerCollapsed ? 'collapsed' : ''}`}>
+            <div className="mobile-explorer-toggle" onClick={() => setFileExplorerCollapsed(!fileExplorerCollapsed)}>
+              {fileExplorerCollapsed ? '📂 Show Files' : '📁 Hide Files'}
+            </div>
             <EnhancedFolderTree
               containerId={user?.containerId}
               onSelect={handleFileSelect}
@@ -295,7 +315,16 @@ function AuthenticatedApp() {
           </div>
 
           {/* Terminal */}
-          <div className="h-80 bg-gray-900 rounded-lg shadow-md overflow-hidden flex-shrink-0">
+          <div className={`bg-gray-900 rounded-lg shadow-md overflow-hidden flex-shrink-0 terminal-mobile ${terminalCollapsed ? 'collapsed' : ''}`} style={{ height: '320px' }}>
+            <div className="terminal-toggle flex justify-between items-center px-2 py-1 bg-gray-800 dark:bg-gray-700 border-b border-gray-700 dark:border-gray-600">
+              <span className="text-xs font-medium text-gray-300">Terminal</span>
+              <button 
+                onClick={() => setTerminalCollapsed(!terminalCollapsed)}
+                className="text-xs px-2 py-1 rounded hover:bg-gray-700 dark:hover:bg-gray-600 text-gray-300"
+              >
+                {terminalCollapsed ? '▼ Expand' : '▲ Collapse'}
+              </button>
+            </div>
             <EnhancedTerminal
               ref={terminalRef}
               containerId={user?.containerId}
