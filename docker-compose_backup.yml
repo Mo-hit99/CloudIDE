@@ -1,5 +1,4 @@
-version: "3.8"
-
+# Cloud IDE - Development Environment
 services:
   mongo:
     image: mongo:8.0
@@ -24,15 +23,21 @@ services:
       - cloud-ide-network
 
   backend:
-    image: mohitkohli007/cloud-ide-backend:latest
+    image: cloud-ide-backend-compose:latest
     container_name: cloud-ide-backend-compose
     restart: unless-stopped
     privileged: true
     ports:
       - "5000:5000"
+    command: ["node", "index.js"]
     depends_on:
       mongo:
         condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./workspace:/app/workspace
     environment:
       - MONGO_URI=mongodb://admin:password123@mongo:27017/cloudIDE?authSource=admin
       - NODE_ENV=development
@@ -45,13 +50,16 @@ services:
       - cloud-ide-network
 
   frontend:
-    image: mohitkohli007/cloud-ide-frontend:latest
+    image: cloud-ide-frontend-compose:latest
     container_name: cloud-ide-frontend-compose
     restart: unless-stopped
     ports:
       - "5173:5173"
     depends_on:
       - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     environment:
       - VITE_API_URL=http://localhost:5000
       - NODE_ENV=development
