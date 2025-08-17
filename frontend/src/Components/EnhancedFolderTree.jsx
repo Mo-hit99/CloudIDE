@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { fileAPI, handleAPIError } from '../services/api';
 
 // File type icons mapping
@@ -178,26 +178,26 @@ const TreeNode = ({
       {showContextMenu && (
         <div
           ref={contextMenuRef}
-          className="absolute z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg py-1 min-w-32"
+          className="absolute z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg py-1 min-w-40"
           style={{ top: '100%', left: `${indent + 8}px` }}
         >
-          {isDirectory && (
-            <>
-              <button
-                onClick={() => handleContextAction('newFile')}
-                className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
-              >
-                📄 New File
-              </button>
-              <button
-                onClick={() => handleContextAction('newFolder')}
-                className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
-              >
-                📁 New Folder
-              </button>
-              <hr className="my-1 border-gray-200 dark:border-gray-600" />
-            </>
-          )}
+          {/* Always show New File and New Folder options */}
+          <button
+            onClick={() => handleContextAction('newFile')}
+            className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
+          >
+            <span className="mr-2">📄</span>
+            New File
+          </button>
+          <button
+            onClick={() => handleContextAction('newFolder')}
+            className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
+          >
+            <span className="mr-2">📁</span>
+            New Folder
+          </button>
+          
+          <hr className="my-1 border-gray-200 dark:border-gray-600" />
           
           {node.data?.executable && (
             <button
@@ -252,11 +252,14 @@ const TreeNode = ({
 const EnhancedFolderTree = ({ containerId, onSelect, onError, onExecute }) => {
   const [treeData, setTreeData] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [selectedPath, setSelectedPath] = useState('/workspace');
+  const [selectedPath] = useState('/workspace');
   const [expandedNodes, setExpandedNodes] = useState(new Set(['/workspace']));
   const [selectedNode, setSelectedNode] = useState(null);
+  const [hideFiles, setHideFiles] = useState(false);
 
   const loadDirectoryTree = useCallback(async (path = selectedPath) => {
+    console.log('🌳 loadDirectoryTree called with containerId:', containerId, 'path:', path);
+    
     if (!containerId) {
       console.warn('No container ID provided to EnhancedFolderTree');
       setTreeData([]);
@@ -265,12 +268,24 @@ const EnhancedFolderTree = ({ containerId, onSelect, onError, onExecute }) => {
 
     setLoading(true);
     try {
+      console.log('📡 Making API request to get directory tree...');
       const response = await fileAPI.getDirectoryTree(containerId, path);
-      setTreeData(response.data);
+      console.log('📡 API response received:', response);
+      console.log('📡 Response data:', response.data);
+      
+      // Ensure response.data is always an array
+      const data = Array.isArray(response.data) ? response.data : [];
+      console.log('📁 Processed tree data:', data);
+      console.log('📁 Number of items:', data.length);
+      
+      setTreeData(data);
     } catch (error) {
+      console.error('❌ Error in loadDirectoryTree:', error);
       const errorMessage = handleAPIError(error);
       console.error('Error loading directory tree:', errorMessage);
       onError?.(errorMessage);
+      // Set empty array on error
+      setTreeData([]);
     } finally {
       setLoading(false);
     }
@@ -291,9 +306,13 @@ const EnhancedFolderTree = ({ containerId, onSelect, onError, onExecute }) => {
   };
 
   const handleSelect = (node) => {
+    console.log('🌳 Node selected in folder tree:', node);
     setSelectedNode(node);
     if (node.data?.type === 'file') {
+      console.log('📄 File node detected, calling onSelect:', node.text, node.data.path);
       onSelect?.(node);
+    } else {
+      console.log('📁 Directory node or invalid type:', node.data?.type);
     }
   };
 
@@ -366,6 +385,33 @@ const EnhancedFolderTree = ({ containerId, onSelect, onError, onExecute }) => {
     }
   };
 
+  // Filter tree data to hide files if hideFiles is true
+  const filteredTreeData = useMemo(() => {
+    if (!hideFiles) return treeData;
+    
+    const filterNode = (node) => {
+      if (node.data?.type === 'file') {
+        return false; // Hide files
+      }
+      
+      // For directories, filter their children
+      if (node.children && node.children.length > 0) {
+        const filteredChildren = node.children
+          .map(filterNode)
+          .filter(Boolean);
+        
+        return {
+          ...node,
+          children: filteredChildren
+        };
+      }
+      
+      return node; // Keep directories
+    };
+    
+    return treeData.map(filterNode).filter(Boolean);
+  }, [treeData, hideFiles]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-32">
@@ -381,13 +427,28 @@ const EnhancedFolderTree = ({ containerId, onSelect, onError, onExecute }) => {
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
             📁 Workspace Files
           </h3>
-          <button
-            onClick={() => loadDirectoryTree()}
-            className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-            title="Refresh"
-          >
-            🔄
-          </button>
+          <div className="flex items-center space-x-2">
+            {/* Hide Files Toggle */}
+            <button
+              onClick={() => setHideFiles(!hideFiles)}
+              className={`p-1.5 rounded transition-colors ${
+                hideFiles 
+                  ? 'bg-blue-500 text-white' 
+                  : 'hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-400'
+              }`}
+              title={hideFiles ? "Show Files" : "Hide Files"}
+            >
+              {hideFiles ? '📁' : '📄'}
+            </button>
+            {/* Refresh Button */}
+            <button
+              onClick={() => loadDirectoryTree()}
+              className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              title="Refresh"
+            >
+              🔄
+            </button>
+          </div>
         </div>
       </div>
 
@@ -399,22 +460,63 @@ const EnhancedFolderTree = ({ containerId, onSelect, onError, onExecute }) => {
           scrollbarWidth: 'thin',
           scrollbarColor: 'rgba(156, 163, 175, 0.6) transparent'
         }}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          // Create context menu for root workspace
+          
+          // Show context menu at cursor position
+          const contextMenu = document.createElement('div');
+          contextMenu.className = 'fixed z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg py-1 min-w-40';
+          contextMenu.style.left = `${e.clientX}px`;
+          contextMenu.style.top = `${e.clientY}px`;
+          
+          contextMenu.innerHTML = `
+            <button class="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center" onclick="this.closest('.fixed').remove(); window.createFileAtRoot();">
+              <span class="mr-2">📄</span>
+              New File
+            </button>
+            <button class="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center" onclick="this.closest('.fixed').remove(); window.createFolderAtRoot();">
+              <span class="mr-2">📁</span>
+              New Folder
+            </button>
+          `;
+          
+          // Add global functions for the context menu
+          window.createFileAtRoot = () => handleCreateFile({ data: { path: selectedPath } });
+          window.createFolderAtRoot = () => handleCreateFolder({ data: { path: selectedPath } });
+          
+          document.body.appendChild(contextMenu);
+          
+          // Remove context menu when clicking outside
+          const removeMenu = () => {
+            if (document.body.contains(contextMenu)) {
+              document.body.removeChild(contextMenu);
+            }
+            document.removeEventListener('click', removeMenu);
+            delete window.createFileAtRoot;
+            delete window.createFolderAtRoot;
+          };
+          
+          setTimeout(() => {
+            document.addEventListener('click', removeMenu);
+          }, 100);
+        }}
       >
         <div className="p-2">
 
-          {treeData.length === 0 ? (
+          {!Array.isArray(filteredTreeData) || filteredTreeData.length === 0 ? (
             <div className="text-center text-gray-500 dark:text-gray-400 py-8">
-              <p>No files found</p>
+              <p>{hideFiles ? "No folders found" : "No files found"}</p>
               <button
                 onClick={() => handleCreateFile({ data: { path: selectedPath } })}
                 className="mt-2 text-blue-500 hover:text-blue-600 text-sm"
               >
-                Create your first file
+                Create your first {hideFiles ? "folder" : "file"}
               </button>
             </div>
           ) : (
             <div className="space-y-1">
-              {treeData.map((node) => (
+              {(Array.isArray(filteredTreeData) ? filteredTreeData : []).map((node) => (
                 <TreeNode
                   key={node.id}
                   node={node}

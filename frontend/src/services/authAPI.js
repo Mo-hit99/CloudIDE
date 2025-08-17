@@ -1,4 +1,20 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// Auto-detect API URL based on environment
+const getAPIBaseURL = () => {
+  // If VITE_API_URL is set, use it
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
+  // In production (built app), use the deployed backend URL
+  if (import.meta.env.VITE_PROD) {
+    return 'https://cloud-ide-backend.onrender.com';
+  }
+  
+  // In development, default to localhost
+  return 'http://localhost:5000';
+};
+
+const API_BASE_URL = getAPIBaseURL();
 
 class AuthAPI {
   constructor() {
@@ -167,7 +183,7 @@ class AuthAPI {
       }
       
       return true;
-    } catch (error) {
+    } catch {
       // Invalid token format
       localStorage.removeItem('token');
       localStorage.removeItem('user');

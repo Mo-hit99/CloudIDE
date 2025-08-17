@@ -1,6 +1,22 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// Auto-detect API URL based on environment
+const getAPIBaseURL = () => {
+  // If VITE_API_URL is set, use it
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
+  // In production (built app), use the deployed backend URL
+  if (import.meta.env.VITE_PROD) {
+    return 'https://cloud-ide-backend.onrender.com';
+  }
+  
+  // In development, default to localhost
+  return 'http://localhost:5000';
+};
+
+const API_BASE_URL = getAPIBaseURL();
 
 // Create axios instance with default config
 const api = axios.create({
@@ -15,6 +31,7 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
+    console.log(`API Base URL: ${API_BASE_URL}`);
 
     // Add authentication token if available
     const token = localStorage.getItem('token');

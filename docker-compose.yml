@@ -23,7 +23,7 @@ services:
       - cloud-ide-network
 
   backend:
-    image: cloud-ide-backend-compose:latest
+    image: mohitkohli007/cloud-ide-backend:latest
     container_name: cloud-ide-backend-compose
     restart: unless-stopped
     privileged: true
@@ -39,7 +39,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./workspace:/app/workspace
     environment:
-      - MONGO_URI=mongodb://admin:password123@mongo:27017/cloudIDE?authSource=admin
+      - MONGO_URI=mongodb+srv://mk3705200:Mohit19061999@cluster0.bxyzbit.mongodb.net/cloudIDE?retryWrites=true&w=majority&appName=Cluster0
       - NODE_ENV=development
       - FRONTEND_URL=http://localhost:5173
       - DOCKER_HOST=unix:///var/run/docker.sock
@@ -50,21 +50,19 @@ services:
       - cloud-ide-network
 
   frontend:
-    image: cloud-ide-frontend-compose:latest
+    image: mohitkohli007/cloud-ide-frontend:latest
     container_name: cloud-ide-frontend-compose
     restart: unless-stopped
     ports:
       - "5173:5173"
     depends_on:
       - backend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     environment:
       - VITE_API_URL=http://localhost:5000
       - NODE_ENV=development
       - VITE_APP_NAME=Cloud IDE
       - VITE_APP_VERSION=2.0.0
+      - BACKEND_URL=http://backend:5000
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:5173"]
       interval: 30s

@@ -25,11 +25,15 @@ dotenv.config();
 const app = express();
 const server = createServer(app);
 const io = new Server(server, {
-  cors: corsOptions
+  cors: corsOptions,
+  transports: ['websocket', 'polling'],
+  allowEIO3: true,
+  pingTimeout: 60000,
+  pingInterval: 25000
 });
 
 const PORT = process.env.PORT || 5000;
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://mongo:27017/cloudIDE';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017cloudIDE';
 
 // Security middleware
 app.use(securityHeaders);

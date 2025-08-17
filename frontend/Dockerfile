@@ -33,6 +33,7 @@ FROM node:${NODE_VERSION} as build
 
 # Accept build arguments
 ARG VITE_API_URL=""
+ARG VITE_PROD="true"
 ARG NODE_ENV=production
 
 WORKDIR /app
@@ -48,6 +49,7 @@ COPY . .
 
 # Set environment variables for build
 ENV VITE_API_URL=${VITE_API_URL}
+ENV VITE_PROD=${VITE_PROD}
 ENV NODE_ENV=${NODE_ENV}
 
 # Build the application
@@ -56,16 +58,27 @@ RUN npm run build
 # Production stage
 FROM nginx:alpine as production
 
-# Install Node.js for serving
-RUN apk add --no-cache nodejs npm
-
-# Install serve globally
-RUN npm install -g serve@14.2.3
-
 # Copy built assets
 COPY --from=build /app/dist /app/dist
 
-WORKDIR /app
+# Copy nginx configuration template
+COPY nginx.conf /etc/nginx/nginx.conf.template
+
+# Create startup script to substitute environment variables
+RUN echo '#!/bin/sh' > /docker-entrypoint.sh && \
+    echo 'set -e' >> /docker-entrypoint.sh && \
+    echo 'echo "BACKEND_URL: $BACKEND_URL"' >> /docker-entrypoint.sh && \
+    echo 'if [ -z "$BACKEND_URL" ]; then' >> /docker-entrypoint.sh && \
+    echo '  BACKEND_URL="https://cloud-ide-backend.onrender.com"' >> /docker-entrypoint.sh && \
+    echo '  echo "BACKEND_URL not set, using default: $BACKEND_URL"' >> /docker-entrypoint.sh && \
+    echo 'else' >> /docker-entrypoint.sh && \
+    echo '  echo "Using BACKEND_URL: $BACKEND_URL"' >> /docker-entrypoint.sh && \
+    echo 'fi' >> /docker-entrypoint.sh && \
+    echo 'sed "s|BACKEND_URL_PLACEHOLDER|$BACKEND_URL|g" /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf' >> /docker-entrypoint.sh && \
+    echo 'echo "Generated nginx.conf:"' >> /docker-entrypoint.sh && \
+    echo 'cat /etc/nginx/nginx.conf' >> /docker-entrypoint.sh && \
+    echo 'exec nginx -g "daemon off;"' >> /docker-entrypoint.sh && \
+    chmod +x /docker-entrypoint.sh
 
 # Expose port
 EXPOSE 5173
@@ -74,5 +87,5 @@ EXPOSE 5173
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:5173 || exit 1
 
-# Start production server
-CMD ["serve", "-s", "dist", "-l", "5173"]
+# Start nginx with environment variable substitution
+CMD ["/docker-entrypoint.sh"]

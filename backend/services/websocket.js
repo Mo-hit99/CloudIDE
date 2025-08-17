@@ -9,6 +9,17 @@ export const setupWebSocketHandlers = (io) => {
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
 
+    // Handle ping/pong for testing
+    socket.on('ping', (data) => {
+      console.log('Received ping:', data);
+      socket.emit('pong', { 
+        message: 'pong', 
+        timestamp: new Date().toISOString(),
+        socketId: socket.id,
+        data: data 
+      });
+    });
+
     // Handle terminal connection request
     socket.on('terminal:connect', async (data) => {
       try {

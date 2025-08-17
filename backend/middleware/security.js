@@ -207,15 +207,20 @@ export const corsOptions = {
       'http://localhost:3000',
       'http://localhost:5173',
       'http://localhost:8080',
+      'https://cloud-ide-frontend.onrender.com',
+      'https://cloud-ide-frontend-render.onrender.com',
       process.env.FRONTEND_URL
     ].filter(Boolean);
     
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      console.log('CORS blocked origin:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 };

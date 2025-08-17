@@ -128,6 +128,67 @@ const createTarStream = (filename, content) => {
   return pack;
 };
 
+// Helper function to build file tree from host filesystem
+const buildHostFileTree = async (hostPath, requestPath = '/workspace') => {
+  try {
+    // Ensure the workspace directory exists
+    try {
+      await fs.access(hostPath);
+    } catch (accessError) {
+      // Directory doesn't exist, create it
+      console.log(`Creating workspace directory: ${hostPath}`);
+      await fs.mkdir(hostPath, { recursive: true });
+    }
+
+    // Read directory contents
+    const entries = await fs.readdir(hostPath, { withFileTypes: true });
+
+    const tree = [];
+    let id = 1;
+
+    for (const entry of entries) {
+      const fullPath = path.join(hostPath, entry.name);
+      const stats = await fs.stat(fullPath);
+
+      const node = {
+        id: id++,
+        text: entry.name,
+        data: {
+          path: path.join(requestPath, entry.name),
+          type: entry.isDirectory() ? 'directory' : 'file',
+          size: entry.isDirectory() ? null : stats.size,
+          permissions: stats.mode.toString(8).slice(-3),
+          fileType: entry.isDirectory() ? 'folder' : getFileType(entry.name),
+          icon: getFileIcon(entry.name, entry.isDirectory()),
+          executable: !entry.isDirectory() && isExecutableFile(entry.name),
+          modified: stats.mtime.toISOString()
+        },
+        children: []
+      };
+
+      // If it's a directory, recursively get children (limit depth)
+      if (entry.isDirectory() && requestPath.split('/').length < 6) {
+        try {
+          const childTree = await buildHostFileTree(fullPath, path.join(requestPath, entry.name));
+          node.children = childTree;
+          node.droppable = true;
+        } catch (childError) {
+          console.error(`Error reading subdirectory ${fullPath}:`, childError);
+          // Continue with empty children
+        }
+      }
+
+      tree.push(node);
+    }
+
+    return tree;
+  } catch (error) {
+    console.error('Error building host file tree:', error);
+    // Always return an empty array instead of throwing
+    return [];
+  }
+};
+
 // Get directory structure with metadata
 router.get('/tree/:containerId', authenticateToken, authorizeWorkspace, fileRateLimit, validateContainerId, async (req, res) => {
   try {
@@ -146,7 +207,8 @@ router.get('/tree/:containerId', authenticateToken, authorizeWorkspace, fileRate
         return;
       } catch (hostError) {
         console.error('Error reading host filesystem:', hostError);
-        res.status(500).json({ error: 'Failed to read workspace directory' });
+        // Return empty array instead of error
+        res.json([]);
         return;
       }
     }
@@ -179,7 +241,8 @@ router.get('/tree/:containerId', authenticateToken, authorizeWorkspace, fileRate
     res.json(tree);
   } catch (error) {
     console.error('Error getting directory tree:', error);
-    res.status(500).json({ error: 'Failed to get directory structure' });
+    // Return empty array instead of error
+    res.json([]);
   }
 });
 
@@ -704,57 +767,7 @@ router.post('/execute/:containerId', authenticateToken, authorizeWorkspace, vali
   }
 });
 
-// Helper function to build file tree from host filesystem
-const buildHostFileTree = async (hostPath, requestPath = '/workspace') => {
 
-  try {
-    // Read directory contents
-    const entries = await fs.readdir(hostPath, { withFileTypes: true });
-
-    const tree = [];
-    let id = 1;
-
-    for (const entry of entries) {
-      const fullPath = path.join(hostPath, entry.name);
-      const stats = await fs.stat(fullPath);
-
-      const node = {
-        id: id++,
-        text: entry.name,
-        data: {
-          path: path.join(requestPath, entry.name),
-          type: entry.isDirectory() ? 'directory' : 'file',
-          size: entry.isDirectory() ? null : stats.size,
-          permissions: stats.mode.toString(8).slice(-3),
-          fileType: entry.isDirectory() ? 'folder' : getFileType(entry.name),
-          icon: getFileIcon(entry.name, entry.isDirectory()),
-          executable: !entry.isDirectory() && isExecutableFile(entry.name),
-          modified: stats.mtime.toISOString()
-        },
-        children: []
-      };
-
-      // If it's a directory, recursively get children (limit depth)
-      if (entry.isDirectory() && requestPath.split('/').length < 6) {
-        try {
-          const childTree = await buildHostFileTree(fullPath, path.join(requestPath, entry.name));
-          node.children = childTree;
-          node.droppable = true;
-        } catch (childError) {
-          console.error(`Error reading subdirectory ${fullPath}:`, childError);
-          // Continue with empty children
-        }
-      }
-
-      tree.push(node);
-    }
-
-    return tree;
-  } catch (error) {
-    console.error('Error building host file tree:', error);
-    throw error;
-  }
-};
 
 // Helper function to execute files on host filesystem
 const executeFileOnHost = async (filePath, fileExt, workingDir) => {

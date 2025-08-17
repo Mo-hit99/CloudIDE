@@ -1,0 +1,21 @@
+# Cloud IDE - Production Environment for Render Deployment
+# This file is specifically for deploying to Render with external backend
+services:
+  frontend:
+    image: mohitkohli007/cloud-ide-frontend:latest
+    container_name: cloud-ide-frontend-render
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=https://cloud-ide-backend.onrender.com
+      - NODE_ENV=production
+      - VITE_APP_NAME=Cloud IDE
+      - VITE_APP_VERSION=2.0.0
+      - BACKEND_URL=https://cloud-ide-backend.onrender.com
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5173"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

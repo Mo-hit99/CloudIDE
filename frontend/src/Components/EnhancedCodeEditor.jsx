@@ -154,7 +154,11 @@ const EnhancedCodeEditor = ({
 
   // Open file in editor
   const openFile = useCallback((file) => {
-    if (!file || file.data?.type !== 'file') return;
+    console.log('🔧 openFile called with:', file);
+    if (!file || file.data?.type !== 'file') {
+      console.log('❌ Invalid file or not a file type:', file);
+      return;
+    }
 
     console.log('🔧 Opening file:', file.text, 'Current open files:', openFiles.length);
 
@@ -306,7 +310,9 @@ const EnhancedCodeEditor = ({
 
   // Open file when currentFile prop changes
   useEffect(() => {
+    console.log('🎯 Current file prop changed:', currentFile);
     if (currentFile) {
+      console.log('📂 Opening current file:', currentFile.text, currentFile.data?.path);
       openFile(currentFile);
     }
   }, [currentFile, openFile]);
@@ -320,6 +326,8 @@ const EnhancedCodeEditor = ({
 
   // Debug logging
   console.log('🎯 CodeEditor render - Open files:', openFiles.length, openFiles.map(f => f.text));
+  console.log('🎯 Active file ID:', activeFileId);
+  console.log('🎯 Current file prop:', currentFile);
 
   return (
     <div className="h-full flex flex-col" style={{ minHeight: '250px' }}>

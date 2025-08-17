@@ -1,80 +1,43 @@
-version: "3.8"
+version: '3.8'
 
 services:
-  mongo:
-    image: mongo:8.0
-    container_name: cloud-ide-mongo-compose
-    restart: unless-stopped
+  backend:
+    image: mohitkohli007/cloud-ide-backend:latest
+    container_name: cloud-ide-backend
     ports:
-      - "27017:27017"
-    volumes:
-      - mongo-data:/data/db
-      - mongo-config:/data/configdb
+      - "5000:5000"
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=admin
-      - MONGO_INITDB_ROOT_PASSWORD=password123
-      - MONGO_INITDB_DATABASE=cloudIDE
+      - NODE_ENV=production
+      - PORT=5000
+      - MONGO_URI=${MONGO_URI:-mongodb://localhost:27017/cloudIDE}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./workspace:/app/workspace
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
-    networks:
-      - cloud-ide-network
-
-  backend:
-    image: mohitkohli007/cloud-ide-backend:latest
-    container_name: cloud-ide-backend-compose
-    restart: unless-stopped
-    privileged: true
-    ports:
-      - "5000:5000"
-    depends_on:
-      mongo:
-        condition: service_healthy
-    environment:
-      - MONGO_URI=mongodb://admin:password123@mongo:27017/cloudIDE?authSource=admin
-      - NODE_ENV=development
-      - FRONTEND_URL=http://localhost:5173
-      - DOCKER_HOST=unix:///var/run/docker.sock
-      - JWT_SECRET=dev-secret-key
-      - JWT_EXPIRES_IN=7d
-      - LOG_LEVEL=debug
-    networks:
-      - cloud-ide-network
+      start_period: 30s
 
   frontend:
     image: mohitkohli007/cloud-ide-frontend:latest
-    container_name: cloud-ide-frontend-compose
-    restart: unless-stopped
+    container_name: cloud-ide-frontend
     ports:
       - "5173:5173"
+    environment:
+      - BACKEND_URL=https://cloud-ide-backend.onrender.com
     depends_on:
       - backend
-    environment:
-      - VITE_API_URL=http://localhost:5000
-      - NODE_ENV=development
-      - VITE_APP_NAME=Cloud IDE
-      - VITE_APP_VERSION=2.0.0
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:5173"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5173"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
-    networks:
-      - cloud-ide-network
-
-volumes:
-  mongo-data:
-    driver: local
-    name: cloud-ide-mongo-data-compose
-  mongo-config:
-    driver: local
-    name: cloud-ide-mongo-config-compose
+      start_period: 30s
 
 networks:
-  cloud-ide-network:
-    driver: bridge
-    name: cloud-ide-network-compose
+  default:
+    name: cloud-ide-network

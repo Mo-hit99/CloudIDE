@@ -275,6 +275,51 @@ export const AuthProvider = ({ children }) => {
     dispatch({ type: AUTH_ACTIONS.CLEAR_ERROR });
   };
 
+  // Validate token on mount
+  useEffect(() => {
+    const validateToken = async () => {
+      const token = localStorage.getItem('token');
+      const userStr = localStorage.getItem('user');
+      
+      if (token && userStr) {
+        try {
+          console.log('🔍 Validating stored token...');
+          const user = JSON.parse(userStr);
+          
+          // Test the token by making a request to the auth/me endpoint
+          const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (response.ok) {
+            console.log('✅ Token is valid, user authenticated');
+            dispatch({
+              type: AUTH_ACTIONS.LOGIN_SUCCESS,
+              payload: { user, token }
+            });
+          } else {
+            console.log('❌ Token is invalid, clearing storage');
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            dispatch({ type: AUTH_ACTIONS.LOGOUT });
+          }
+        } catch (error) {
+          console.error('Token validation error:', error);
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          dispatch({ type: AUTH_ACTIONS.LOGOUT });
+        }
+      } else {
+        console.log('🔑 No stored token found');
+        dispatch({ type: AUTH_ACTIONS.LOGOUT });
+      }
+    };
+
+    validateToken();
+  }, []);
+
   // Context value
   const value = {
     // State

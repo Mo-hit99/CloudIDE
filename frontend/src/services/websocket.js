@@ -8,10 +8,48 @@ class WebSocketService {
     this.maxReconnectAttempts = 5;
     this.reconnectDelay = 1000;
     this.eventHandlers = new Map();
+    this.socketUrl = null;
   }
 
   connect(url = null) {
-    const socketUrl = url || import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    // Auto-detect API URL based on environment
+    const getAPIBaseURL = () => {
+      // If VITE_API_URL is set, use it
+      if (import.meta.env.VITE_API_URL) {
+        return import.meta.env.VITE_API_URL;
+      }
+      
+      // In production (built app), use the deployed backend URL
+      if (import.meta.env.VITE_PROD) {
+        return 'https://cloud-ide-backend.onrender.com';
+      }
+      
+      // In development, default to localhost
+      return 'http://localhost:5000';
+    };
+
+    // Convert HTTP URL to WebSocket URL
+    const getWebSocketURL = (httpUrl) => {
+      if (!httpUrl) return null;
+      
+      // Convert https:// to wss:// and http:// to ws://
+      if (httpUrl.startsWith('https://')) {
+        return httpUrl.replace('https://', 'wss://');
+      } else if (httpUrl.startsWith('http://')) {
+        return httpUrl.replace('http://', 'ws://');
+      }
+      
+      return httpUrl;
+    };
+
+    // Set WebSocket URL based on environment
+    if (url) {
+      this.socketUrl = getWebSocketURL(url);
+    } else {
+      // Convert HTTP URL to WebSocket URL
+      const httpUrl = getAPIBaseURL();
+      this.socketUrl = getWebSocketURL(httpUrl);
+    }
 
     if (this.socket && this.socket.connected) {
       console.log('WebSocket already connected');
@@ -22,16 +60,28 @@ class WebSocketService {
       this.disconnect();
     }
 
-    console.log('Connecting to WebSocket server:', socketUrl);
-
-    this.socket = io(socketUrl, {
+    console.log('Connecting to WebSocket server:', this.socketUrl);
+    console.log('WebSocket connection details:', {
+      url: this.socketUrl,
       transports: ['websocket', 'polling'],
-      timeout: 10000,
+      timeout: 20000,
+      withCredentials: true
+    });
+
+    this.socket = io(this.socketUrl, {
+      transports: ['websocket', 'polling'],
+      timeout: 20000,
       forceNew: true,
       autoConnect: true,
       reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000
+      reconnectionAttempts: 10,
+      reconnectionDelay: 2000,
+      upgrade: true,
+      rememberUpgrade: true,
+      withCredentials: true,
+      extraHeaders: {
+        'Access-Control-Allow-Origin': '*'
+      }
     });
 
     this.setupEventHandlers();
@@ -63,6 +113,23 @@ class WebSocketService {
 
     this.socket.on('connect_error', (error) => {
       console.error('WebSocket connection error:', error);
+      console.error('WebSocket connection details:', {
+        url: this.socketUrl,
+        error: error.message,
+        type: error.type,
+        description: error.description,
+        context: error.context,
+        code: error.code
+      });
+      
+      // Log additional debugging information
+      console.log('Connection attempt details:', {
+        socketUrl: this.socketUrl,
+        transports: this.socket.io.opts.transports,
+        timeout: this.socket.io.opts.timeout,
+        withCredentials: this.socket.io.opts.withCredentials
+      });
+      
       this.emit('connection:error', { error: error.message });
       this.handleReconnect();
     });

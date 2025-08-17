@@ -64,10 +64,7 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for better query performance
-userSchema.index({ email: 1 });
-userSchema.index({ username: 1 });
-userSchema.index({ workspaceId: 1 });
+// Index for better query performance - removed duplicates since unique: true already creates indexes
 
 // Pre-save middleware to generate workspace ID and hash password
 userSchema.pre('save', async function(next) {
