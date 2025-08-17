@@ -39,7 +39,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./workspace:/app/workspace
     environment:
-      - MONGO_URI=mongodb+srv://mk3705200:Mohit19061999@cluster0.bxyzbit.mongodb.net/cloudIDE?retryWrites=true&w=majority&appName=Cluster0
+      - MONGO_URI=mongodb://admin:password123@mongo:27017/cloudIDE?authSource=admin
       - NODE_ENV=development
       - FRONTEND_URL=http://localhost:5173
       - DOCKER_HOST=unix:///var/run/docker.sock
